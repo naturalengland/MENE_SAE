@@ -1,2 +1,5 @@
 # Natural_England-MENE
-Natural England MENE survey: small area estimation
+
+Code to perform Bayesian Small Area Estimation on data from the Natural England MENE survey.
+
+Produced under contract to Natural England.
