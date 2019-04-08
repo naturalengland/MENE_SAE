@@ -1,3 +1,5 @@
 library('testthat')
 source("R/sanitize_mene.R")
+source("R/mene_to_stan.R")
 test_file("R/tests/testthat/test_preprocess.R")
+test_file("R/tests/testthat/test_mene_to_stan.R")
