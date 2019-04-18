@@ -60,7 +60,7 @@ sam.df$health <- factor(sam.df$health, levels = c("Very bad", "Bad", "Fair", "Go
   
   
 \N As noted above, even a clearly conceptualised variable such as age can be banded differently in different census tables.  Tables~\ref{mene_age} and \ref{sam_age} record the number of respondents in the MENE survey and the SAM by designated age band. It can be seen that more age bands are available in the SAM data, however there is a direct 1:1 mapping of a collapsed version of the SAM age bands onto the MENE categorization.
-  
+ 
 <<mene_age, fig=FALSE, results=tex, echo=FALSE>>=
 mene_age <- xtable(with(mene.df, xtabs(~age, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by age band", label="mene_age", auto=TRUE)
 print(mene_age, include.colnames=FALSE, format.args=list(big.mark=","))
@@ -93,7 +93,7 @@ print(sam_sex, include.colnames=FALSE, format.args=list(big.mark=","))
 
 \subsection{Car ownership}
 
-\N Tables~\ref{mene_car} and \ref{sam_cars} tabulate the responses to questions on car ownership.  These are very likely key predictor variables for access to the environment. The MENE survey data only records whether or not a car is available, the census microdata are more granular. However, it is clearly possible to map the SAM data to the MENE survey and use presence or absence of a car as both a  predictor variable in modelling the survey response as well as an auxiliary variable.
+N Tables~\ref{mene_car} and \ref{sam_cars} tabulate the responses to questions on car ownership.  These are very likely key predictor variables for access to the environment. The MENE survey data only records whether or not a car is available, the census microdata are more granular. However, it is clearly possible to map the SAM data to the MENE survey and use presence or absence of a car as both a  predictor variable in modelling the survey response as well as an auxiliary variable.
 
 <<mene_car, fig=FALSE, results=tex, echo=FALSE>>=
 mene_car <- xtable(with(mene.df, xtabs(~car, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by car ownership", label="mene_car", auto=TRUE)
@@ -112,8 +112,6 @@ print(sam_cars, include.colnames=FALSE, format.args=list(big.mark=","))
 mene_car_year <- xtable(with(mene.df, xtabs(~year + car, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by car ownership by year", label="mene_car_year", auto=TRUE)
 print(mene_car_year, include.colnames=TRUE, format.args=list(big.mark=","))
 @
-
-
 
 \clearpage
 
@@ -299,4 +297,3 @@ print(mene_adults_in_hh, include.colnames=FALSE, format.args=list(big.mark=","))
 \N Further variables are available in the MENE survey describing the area ratherr than the individual. It is our view that given we are given the respondent postcode sector, it is possible to obtain a much wider range of geospatial information than contained in the MENE survey that would be directly available as an auxiliary variable. It would also be possible to incorporate this in a multilevel or a spatial model.
 
 \N These are not considered here further due to the time restrictions on the 
-

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e; set -u;
 
-INPUTresp=/home/phewson/mene/mene_year_1-9_respondent_data.csv
+INPUTresp=$DATAROOT/SourceData/Observations/NaturalEngland/MENE/mene_year_1-9_respondent_data.csv
 [[ -f $INPUTresp ]] || { >&2 echo Missing input file: [$INPUTresp] ; exit 5 ; }
 
 cat <<EOF
@@ -153,4 +153,4 @@ create unlogged table staging.natural_england_mene_respondents_y1_9 (
 
 EOF
 
-# id2,RespondentID,Interviewdate,WeekWeightANNUAL,MonthWeightANNUAL,QuarterWeightANNUAL,Converted_WeekWeightANNUAL,Converted_MonthWeightANNUAL,Converted_QuarterWeightANNUAL,weekweightCUMULATIVE,monthweightCUMULATIVE,quarterweightCUMULATIVE,LAWeightY4PHOF,LAWeightY1Y3PHOF,LAWeightY1Weekly,LAWeightY2Weekly,LAWeightY3Weekly,LAWeightY4Weekly,LAWeightY5Weekly,LAWeightY6Weekly,LAWeightY7Weekly,LAWeightY1Y7Weekly,LAWeightWeeklyY1Y7Monthly,PHOF,year,q1,q17,q18_01,q18_02,q18_03,q18_04,q18_05,q18_06,q18_07,q18_08,q18_09,q18_10,q18_11,q18_12,q18_13,q18_14,q18_15,q18_16,q18_17,q18_18,q18_19,q18_20,q18_21,q18_23,q18_24,e2_1,e2_2,e2_3,e2_4,e3_01,e3_02,e3_03,e3_04,e3_05,e3_06,e3_07,e3_08,e3_09,e3_10,e4_1,e4_2,e4_3,e4_4,e4_5,e4_6,e4_7,e4_8,e4_9,e4_10,e4_11,e4_12,e5,e6_01,e6_02,e6_03,e7,e8_01,e8_02,e8_03,e8_04,e8_05,e8_06,e8_07,e8_08,e8_09,e8_10,e8_11,e8_12,e8_13,e8_14,e8_15,e8_16,e8_17,age,sex,ethnicity,disability,marital,workstat,seg,segall,lifestage,physical,adults_in_hh,child_in_hh,nchild_in_hh,hh_size,tenure,workstat5,car,dog,generalhealth,internetaccess,email,wellbeing1,q1a,q1b,q1c,q2NEW,RESIDENCE_LOCALAUTHORITY,RESIDENCE_UPPERTIER_LOCALAUTHORITY,RESIDENCE_NCA,RESIDENCE_CONSTITUENCY,RESIDENCE_LOCALACCESSFORUM,RESIDENCE_REGION,RESIDENCE_CEREMONIALCOUNTY,RESIDENCE_NATIONALPARK,RESIDENCE_AONB,RESIDENCE_HERITAGECOAST,RESIDENCE_WHS,RESIDENCE_NIA,RESIDENCE_GREENBELT,RESIDENCE_RURALURBAN,RESIDENCEIMDRANK,RESIDENCE_POSTCODE_SECTOR
+echo "select staging.import_natural_england_mene_respondents();"

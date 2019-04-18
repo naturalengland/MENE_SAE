@@ -9,7 +9,6 @@ mene.df <- mene_code_q17(mene.df)
 require(arm)
 @
  
- 
 \section{Exploratory Modelling}
 
 \N For the purposes of the feasibility study, given the complexity of dealing with nine years of survey data\footnote{There are issues with missing data and so on which are associated with the year/wave of the survey}, an automatic variable selection method based on AIC was applied from the MASS package\footnote{Venables, W. N. \& Ripley, B. D. (2002) Modern Applied Statistics with S. Fourth Edition. Springer, New York. ISBN 0-387-95457-0}, namely using the \texttt{stepAIC()} function.   The aim is to select a model which can provide an adequate representation of the survey data and which is sufficient for small area estimation.
