@@ -1,0 +1,301 @@
+\SweaveOpts{prefix.string=figs/eda}
+<<prep, echo=FALSE, results=hide>>=
+library(rpostgis)
+library(xtable)
+drv <- dbDriver("PostgreSQL")
+con <- dbConnect(drv, dbname = "gis")
+sam.df <- dbGetQuery(con, "select ageh, sex, cars, e.general_description || ':' || e.description as ethnicity, scgpuk11c, tenduk11, tenure, lower_age, upper_age, marstat, disability, dpcfamuk11, family_structure, sizhuk11, hours, substring(ec.description, 1, 10) || ':' || substring(ec.economic_activity, 1, 10) as econact, cars, health
+                       from ons_la_small_area_microdata sam 
+                       left join ons_sam_agebands a
+                       on sam.ageh=a.agehrp
+                       left join ons_sam_ethnicity e
+                       on sam.ethnicityew = e.idx
+                       left join ons_sam_econact ec
+                     on sam.ecopuk11 = ec.idx;")
+
+dbTableInfo(con, "ons_la_small_area_microdata")
+
+
+mene.df <- dbGetQuery(con, "select q1, q17, tenure, age, sex, ethnicity, disability,
+                            marital, workstat, seg, segall, lifestage, physical,
+                            adults_in_hh, child_in_hh, hh_size, workstat,
+                            car, generalhealth, year
+                       from staging.natural_england_mene_respondents_y1_9;")
+mene.df$age = as.factor(mene.df$age)
+
+mene.df$sex = as.factor(mene.df$sex)
+sam.df$sex= as.factor(sam.df$sex)
+mene.df$seg = as.factor(mene.df$seg)
+mene.df$segall = as.factor(mene.df$segall)
+sam.df$scgpuk11c = as.factor(sam.df$scgpuk11c)
+mene.df$tenure = as.factor(mene.df$tenure)
+sam.df$tenure = as.factor(sam.df$tenure)
+mene.df$ethnicity = as.factor(mene.df$ethnicity)
+sam.df$ethnicity = as.factor(sam.df$ethnicity)
+mene.df$disability = as.factor(mene.df$disability)
+sam.df$disability = as.factor(sam.df$disability)
+mene.df$marstat = as.factor(mene.df$marital)
+sam.df$marstat = as.factor(sam.df$marstat)
+mene.df$adults_in_hh <- as.factor(mene.df$adults_in_hh)
+mene.df$child_in_hh <- as.factor(mene.df$child_in_hh)
+mene.df$hh_size <- as.factor(mene.df$hh_size)
+sam.df$dpcfamuk11 <- as.factor(sam.df$dpcfamuk11)
+sam.df$family_structure <- as.factor(sam.df$family_structure)
+sam.df$sizhuk11 <- as.factor(sam.df$sizhuk11)
+mene.df$workstat <- as.factor(mene.df$workstat)
+sam.df$hours <- as.factor(sam.df$hours)
+mene.df$car <- as.factor(mene.df$car)
+sam.df$cars <- as.factor(sam.df$cars)
+mene.df$genhealth <- factor(mene.df$generalhealth, levels = c("Don't know", "Very bad", "Bad", "Fair", "Good", "Very good"))
+sam.df$health <- factor(sam.df$health, levels = c("Very bad", "Bad", "Fair", "Good", "Very good"))
+@
+ 
+ 
+\section{Comparison of variables in MENE survey and Census Small Area Microdata} 
+ 
+\N In order to perform small area estimation it is necessary to match predictor variables from the survey of interest with variables in the auxiliary data. For this feasibility study we are going to concentrate on using the Small Area Microdata from the 2011 census as auxiliary data, as it allows for a full cross-classification of all predictor variables. However, it should be noted that there are differences in the way different variables are classified in different census outputs.   Specifically, age banding can be very different, and larger classifications on social factors can be collapsed in various ways. Therefore the first task is to review the potential matches between the two sets of variables.
+ 
+  
+\subsection{Age}
+  
+  
+\N Tables~\ref{mene_age} and \ref{sam_age} record the number of respondents in the MENE survey and the SAM by designated age band. It can be seen that more age bands are available in the SAM data, however there is a direct 1:1 mapping of a collapsed version of the SAM age bands onto the MENE categorization.
+  
+<<mene_age, fig=FALSE, results=tex, echo=FALSE>>=
+mene_age <- xtable(with(mene.df, xtabs(~age, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by age band", label="mene_age", auto=TRUE)
+print(mene_age, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+<<sam_age, fig=FALSE, results=tex, echo=FALSE>>=  
+sam.df$age_band = as.factor(paste(sam.df$lower_age, "-", sam.df$upper_age))
+levels(sam.df$age_band)[levels(sam.df$age_band) =="90 - NA"] <- "90+"
+levels(sam.df$age_band)[levels(sam.df$age_band) =="NA - NA"] <- NA
+sam_age <- xtable(with(sam.df, xtabs(~age_band, exclude=NULL, na.action=na.pass)), caption="SAM respondents by age band", label="sam_age", auto=TRUE)
+print(sam_age, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+\clearpage
+
+
+\subsection{Sex}
+
+Tables~\ref{mene_sex} and \ref{sam_sex} (perhaps obviously) match well in terms of sex. It does look as if the MENE survey response rate might have been \emph{slightly} higher amongst females.
+
+<<mene_sex, fig=FALSE, results=tex, echo=FALSE>>=
+mene_sex <- xtable(with(mene.df, xtabs(~sex, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by sex", label="mene_sex", auto=TRUE)
+print(mene_sex, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+<<sam_sex, fig=FALSE, results=tex, echo=FALSE>>=  
+sam_sex <- xtable(with(sam.df, xtabs(~sex, exclude=NULL, na.action=na.pass)), caption="SAM respondents by sex", label="sam_sex", auto=TRUE)
+print(sam_sex, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+\clearpage
+
+\subsection{Car ownership}
+
+\N Tables~\ref{mene_car} and \ref{sam_cars} tabulate the responses to questions on car ownership.  These are very likely key predictor variables for access to the environment. The MENE survey data only records whether or not a car is available, the census microdata are more granular. However, it is clearly possible to map the SAM data to the MENE survey and use presence or absence of a car as both a predictor and auxiliary variable.
+
+<<mene_car, fig=FALSE, results=tex, echo=FALSE>>=
+mene_car <- xtable(with(mene.df, xtabs(~car, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by car ownership", label="mene_car", auto=TRUE)
+print(mene_car, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+<<sam_cars, fig=FALSE, results=tex, echo=FALSE>>=  
+sam_cars <- xtable(with(sam.df, xtabs(~cars, exclude=NULL, na.action=na.pass)), caption="SAM respondents by car ownership", label="sam_cars", auto=TRUE)
+print(sam_cars, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+
+\N However, an obvious problem with the car ownership variable appears to be in relation to the years when this variable was recorded.   Table~\ref{mene_car_year} illustrates the problem.
+
+<<mene_car_year, fig=FALSE, results=tex, echo=FALSE>>=
+mene_car_year <- xtable(with(mene.df, xtabs(~year + car, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by car ownership by year", label="mene_car_year", auto=TRUE)
+print(mene_car_year, include.colnames=TRUE, format.args=list(big.mark=","))
+@
+
+
+
+
+\clearpage
+
+\subsection{Self reported health}
+
+\N Tables~\ref{mene_genhealth} and \ref{sam_health} tabulate the responses to  the census and MENE survey in relation to self reported general health. These variables appear to match up well and can be used for small area estimation.
+
+<<mene_genhealth, fig=FALSE, results=tex, echo=FALSE>>=
+mene_genhealth <- xtable(with(mene.df, xtabs(~genhealth, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by health status", label="mene_genhealth", auto=TRUE)
+print(mene_genhealth, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+<<sam_health, fig=FALSE, results=tex, echo=FALSE>>=  
+sam_health <- xtable(with(sam.df, xtabs(~health, exclude=NULL, na.action=na.pass)), caption="SAM respondents by health status", label="sam_health", auto=TRUE)
+print(sam_health, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+\clearpage
+
+
+
+\subsection{Working status}
+
+\N Tables~\ref{mene_workstat} and \ref{sam_econact} record some information on working status. It would appear that it might be possible to collapse both variables to some form of Student, Unemployed, Part Time Work, Full Time Work, Retired if that is necessary.  Figure~\ref{sam_hours} provides further details on the working hours for those census respondents where this is relevant.
+
+<<mene_workstat, fig=FALSE, results=tex, echo=FALSE>>=
+mene_workstat <- xtable(with(mene.df, xtabs(~workstat, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by working hours", label="mene_workstat", auto=TRUE)
+print(mene_workstat, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+<<sam_econact, fig=FALSE, results=tex, echo=FALSE>>=  
+sam_econact <- xtable(with(sam.df, xtabs(~econact, exclude=NULL, na.action=na.pass)), caption="SAM respondents by economic activity", label="sam_econact", auto=TRUE)
+print(sam_econact, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+<<sam_hours, fig=FALSE, results=tex, echo=FALSE>>=  
+sam_hours <- xtable(with(sam.df, xtabs(~hours, exclude=NULL, na.action=na.pass)), caption="SAM respondents by working hours", label="sam_hours", auto=TRUE)
+print(sam_hours, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+\clearpage
+
+
+
+\subsection{Socio-economic grouping}
+
+\N Tables~\ref{mene_seg} and \ref{sam_seg} shows that the MENE survey and SAM data match in usage of the shorter version of Socio-economic groupings.   The MENE survey does have a fuller listing (shown in table~\ref{mene_segall}) but there is insufficient information in the SAM to match.
+
+<<mene_seg, fig=FALSE, results=tex, echo=FALSE>>=
+mene_seg <- xtable(with(mene.df, xtabs(~seg, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by socio-economic group", label="mene_seg", auto=TRUE)
+print(mene_seg, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+<<sam_seg, fig=FALSE, results=tex, echo=FALSE>>=  
+sam_scgpuk11c <- xtable(with(sam.df, xtabs(~scgpuk11c, exclude=NULL, na.action=na.pass)), caption="SAM respondents by socio-economic group", label="sam_seg", auto=TRUE)
+print(sam_scgpuk11c, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+
+<<mene_segall, fig=FALSE, results=tex, echo=FALSE>>=
+mene_segall <- xtable(with(mene.df, xtabs(~segall, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by socio-economic group (full listing)", label="mene_segall", auto=TRUE)
+print(mene_segall, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+\clearpage
+
+
+\subsection{Tenure}
+
+\N The MENE survey uses a shorter form of tenure classification (table~\ref{mene_tenure}) which does not match exactly the shorter form of the sam tenure classification (table~\ref{sam_tenure}).   However, there is a longer version of the tenure classification in the SAM (table~\ref{sam_tenduk11}) and it may be possible to get a reasonable mapping between the two variables if this is necessary.
+
+<<mene_tenure, fig=FALSE, results=tex, echo=FALSE>>=
+mene_tenure <- xtable(with(mene.df, xtabs(~tenure, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by tenure", label="mene_tenure", auto=TRUE)
+print(mene_tenure, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+<<sam_tenure, fig=FALSE, results=tex, echo=FALSE>>=  
+sam_tenure <- xtable(with(sam.df, xtabs(~tenure, exclude=NULL, na.action=na.pass)), caption="SAM respondents by tenure", label="sam_tenure", auto=TRUE)
+print(sam_tenure, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+
+<<sam_tenduk11, fig=FALSE, results=tex, echo=FALSE>>=  
+sam_tenduk11 <- xtable(with(sam.df, xtabs(~tenduk11, exclude=NULL, na.action=na.pass)), caption="SAM respondents by tenure (tenduk11)", label="sam_tenduk11", auto=TRUE)
+print(sam_tenduk11, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+\clearpage
+
+
+\subsection{Ethnicity}
+
+\N Tables~\ref{mene_ethnicity} and \ref{sam_ethnicity} denote responses on the census as tabulated in the SAM and the MENE survey in relation to ethnicity.   These are possibly not identical, but it appears that it would be possible to match on a collapsed, simplified classification.
+
+<<mene_ethnicity, fig=FALSE, results=tex, echo=FALSE>>=
+mene_ethnicity <- xtable(with(mene.df, xtabs(~ethnicity, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by ethnicity", label="mene_ethnicity", auto=TRUE)
+print(mene_ethnicity, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+<<sam_ethnicity, fig=FALSE, results=tex, echo=FALSE>>=  
+sam_ethnicity <- xtable(with(sam.df, xtabs(~ethnicity, exclude=NULL, na.action=na.pass)), caption="SAM respondents by ethnicity", label="sam_ethnicity", auto=TRUE)
+print(sam_ethnicity, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+\clearpage
+
+
+\subsection{Marital Status}
+
+\N Tables~\ref{mene_marstat} and \ref{sam_marstat} depict the classification of marital status by the two surveys.  There is no perfect match, but it appears possible to apply a simpler mapping.
+
+<<mene_marstat, fig=FALSE, results=tex, echo=FALSE>>=
+mene_marstat <- xtable(with(mene.df, xtabs(~marstat, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by marital status", label="mene_marstat", auto=TRUE)
+print(mene_marstat, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+<<sam_marstat, fig=FALSE, results=tex, echo=FALSE>>=  
+sam_marstat <- xtable(with(sam.df, xtabs(~marstat, exclude=NULL, na.action=na.pass)), caption="SAM respondents by marital status", label="sam_marstat", auto=TRUE)
+print(sam_marstat, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+\clearpage
+
+\subsection{Disability}
+
+\N Tables~\ref{mene_disability} and \ref{sam_disability} depict the classification of self reported disability status by MENE survey and SAM.  These could be difficult to reconcile, as we have no way of understanding how a person who entered some limitations on the census would have recorded a binary indicator on the MENE survey. This is a known problem when attemption to reconcile the 2001 census (which also has a yes/no classification) with the 2011 census.
+
+<<mene_disability, fig=FALSE, results=tex, echo=FALSE>>=
+mene_disability <- xtable(with(mene.df, xtabs(~disability, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by self-reported disability status", label="mene_disability", auto=TRUE)
+print(mene_disability, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+<<sam_disability, fig=FALSE, results=tex, echo=FALSE>>=  
+sam_disability <- xtable(with(sam.df, xtabs(~disability, exclude=NULL, na.action=na.pass)), caption="SAM respondents by self-reported disability status", label="sam_disability", auto=TRUE)
+print(sam_disability, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+\clearpage
+
+\subsection{Family structure}
+
+\N Tables~\ref{mene_hh_size} and \ref{sam_sizhuk11} are comparable in terms of indicating the number of members of a household up until 4.  The MENE then records all households of 5 and more together whereas the SAM breaks down 5 person, 6 person and 7 and more person households. Clearly, it is possible to map the SAM data to the MENE classification.   Further variables record number of children and family structure. It may be possible to provide some reduced common variable on family structure if that is important.
+
+<<mene_hh_size, fig=FALSE, results=tex, echo=FALSE>>=
+mene_hh_size <- xtable(with(mene.df, xtabs(~hh_size, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by number in household", label="mene_hh_size", auto=TRUE)
+print(mene_hh_size, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+<<sam_sizhuk11, fig=FALSE, results=tex, echo=FALSE>>=  
+sam_sizhuk11 <- xtable(with(sam.df, xtabs(~sizhuk11, exclude=NULL, na.action=na.pass)), caption="SAM respondents by numbers in household", label="sam_sizhuk11", auto=TRUE)
+print(sam_sizhuk11, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+\clearpage
+
+\N There are further variables in the MENE dataset which break down households by the numbers of children and adults in a household (figures~\ref{mene_child_in_hh} and \ref{mene_adults_in_hh}).  It is perhaps possible to compare the first table (number of children) with data given by the census shown in table~\ref{sam_dpcfamuk11}.   The census further more gives information on a respondents status within a household~\ref{sam_family_structure}.   However, such mappings are not trivial and will not be pursued for this feasibility study.
+
+<<mene_child_in_hh, fig=FALSE, results=tex, echo=FALSE>>=
+mene_child_in_hh <- xtable(with(mene.df, xtabs(~child_in_hh, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by number of children in household", label="mene_child_in_hh", auto=TRUE)
+print(mene_child_in_hh, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+<<sam_sizhuk11, fig=FALSE, results=tex, echo=FALSE>>=  
+sam_dpcfamuk11 <- xtable(with(sam.df, xtabs(~dpcfamuk11, exclude=NULL, na.action=na.pass)), caption="SAM respondents by number of children in household", label="sam_dpcfamuk11", auto=TRUE)
+print(sam_dpcfamuk11, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+
+<<mene_adults_in_hh, fig=FALSE, results=tex, echo=FALSE>>=
+mene_adults_in_hh <- xtable(with(mene.df, xtabs(~adults_in_hh, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by number of adults in household", label="mene_adults_in_hh", auto=TRUE)
+print(mene_adults_in_hh, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+
+
+
+
+\clearpage
+
+\subsection{Lifestage}
+
+\N The MENE survey contains a demographic variable ``lifestage''.   There is no simple mapping onto any variable in the census SAM release, although it may be possible to construct some kind of common variable.
+
+
+\subsection{Areal level variables}
+
+\N Further variables are available in the MENE survey describing the area ratherr than the individual. It is our view that given we are given the respondent postcode sector, it is possible to obtain a much wider range of geospatial information than contained in the MENE survey that would be directly available as an auxiliary variable. It would also be possible to incorporate this in a multilevel or a spatial model. These are not considered here further.
+

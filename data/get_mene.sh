@@ -5,8 +5,7 @@
 set -e
 
 BASEURL=http://publications.naturalengland.org.uk/file/
-# TARGETPATH=$DATAROOT/SourceData/Observations/NaturalEngland/MENE/
-TARGETPATH=/home/phewson/mene/
+TARGETPATH=$DATAROOT/SourceData/Observations/NaturalEngland/MENE/
 declare -A filenumbers
 
 filenumbers[6252849495539712]=excel_spss_mene_weighting_guide.pdf
@@ -20,7 +19,7 @@ filenumbers[5749422113947648]=mene_year_1_to_5_childrens_data.csv
 
 for file in "${!filenumbers[@]}"; do
     wget -nc $BASEURL$file -P "$TARGETPATH"
-    ln -s "$TARGETPATH$file" "$TARGETPATH${filenumbers[$file]}"
+    cp "$TARGETPATH$file" "$TARGETPATH${filenumbers[$file]}"
 done
 
 

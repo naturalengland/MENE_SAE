@@ -1,0 +1,301 @@
+\pdfminorversion=4
+\documentclass[12pt]{tufte-book}
+\usepackage[sfdefault]{roboto}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{natbib}
+\bibliographystyle{chicago}
+\usepackage{tikz}
+\usetikzlibrary{positioning,calc,shapes}
+\usepackage{hyperref}
+\usepackage{float} % allows figure inside minipage
+% \usepackage[xindy,toc]{glossaries}
+%\usepackage{natbib}
+%\makeglossaries
+\setcounter{secnumdepth}{2}
+\newcounter{parnum}
+\newcommand{\N}{%
+  \noindent\refstepcounter{parnum}%
+  \makebox[\parindent][l]{\textbf{\arabic{parnum}.}}}
+\setlength{\parindent}{100em}
+
+% Use a generous paragraph indent so numbers can be fit inside the
+% indentation space.
+% chapter format
+\titleformat{\chapter}%
+  {\huge\rmfamily\color{black}}% format applied to label+text
+  {\llap{\colorbox{gray}{\parbox{1.5cm}{\hfill\itshape\huge\color{white}\thechapter}}}}% label
+  {2pt}% horizontal separation between label and title body
+  {}% before the title body
+  []% after the title body
+
+% section format
+\titleformat{\section}%
+  {\normalfont\Large\itshape\color{black}}% format applied to label+text
+  {\llap{\colorbox{gray}{\parbox{1.5cm}{\hfill\color{white}\thesection}}}}% label
+  {1em}% horizontal separation between label and title body
+  {}% before the title body
+  []% after the title body
+
+% subsection format
+\titleformat{\subsection}%
+  {\normalfont\large\itshape\color{black}}% format applied to label+text
+  {\llap{\colorbox{gray}{\parbox{1.5cm}{\hfill\color{white}\thesubsection}}}}% label
+  {1em}% horizontal separation between label and title body
+  {}% before the title body
+  []% after the title body
+
+\makeatletter
+\renewcommand{\@tufte@reset@par}{%
+  \setlength{\RaggedRightParindent}{1.0pc}%
+  \setlength{\JustifyingParindent}{1.0pc}%
+  \setlength{\parindent}{1pc}%
+  \setlength{\parskip}{10pt}%
+}
+\@tufte@reset@par% chktex 1
+\makeatother
+
+% Needed for tikz flowchart
+\pgfdeclarelayer{background}
+\pgfdeclarelayer{foreground}
+\pgfsetlayers{background,main,foreground}
+
+\tikzstyle{datablock}=[draw, fill=blue!20, text width=5em,
+    text centered, minimum height=2.5em]
+\tikzstyle{ann} = [above, text width=5em]
+\tikzstyle{modelfits} = [datablock, text width=6em, fill=red!20,
+    minimum height=12em, rounded corners]
+\def\blockdist{3.3}
+\def\edgedist{3.5}
+% end Needed for tikz flowchart
+
+\title{MENE survey: Small Area Estimates}
+
+\hyphenation{Map-Node}
+
+%\author{City Science Corporation}
+
+\renewcommand{\maketitlepage}{%
+\tikz[remember picture,overlay] \node[opacity=1,inner sep=0pt] at
+(current page.center){\includegraphics[width=\paperwidth,height=\paperheight]{corporate_images/bluebell}};
+
+\vspace*{0.7\textheight}
+\begin{figure}
+\begin{center}
+\begin{tikzpicture}[scale=2, transform canvas={scale=2}]
+  \node[draw, fill=black, fill opacity=0.7, text=black, text opacity = 1,
+        rectangle split, rectangle split parts=2, line width=0,
+        align=center] (a) {
+\Large{\color{green} Natural England}\\
+\large{\color{white}\textit{Small Area Estimation feasibility: MENE survey}}
+\nodepart{second}
+\includegraphics[width=0.5\textwidth, trim=25pt 25pt 25pt 25pt]{corporate_images/csclogo.png}
+};
+\draw[ultra thick] (a.text split west) -- (a.text split east);
+\end{tikzpicture}
+\end{center}
+\end{figure}
+
+\thispagestyle{empty}%
+
+}
+
+\newcommand*{\blt}{
+   \item[] \includegraphics[width=8pt]{corporate_images/cscbullet.png}
+}
+
+
+
+%\documentclass[a4paper,portrait,12pt]{article}
+%\usepackage[latin1]{inputenc}
+%\usepackage{setspace}
+%\usepackage{graphicx}
+%\usepackage{color}
+%\usepackage{hyperref}
+ 
+%\begin{document}
+%\SweaveOpts{concordance=TRUE}
+
+\begin{document}
+\maketitle
+
+\newpage
+\begin{tabular}{ll}
+{\color{blue}Date issued:} &  {\color{blue}29th March 2019}\\
+{\color{blue}Document status:} & {\color{blue}Draft}\\
+{\color{blue}Version number:} & {\color{blue} 0.5}\\
+{\color{blue}Document history:} & \\
+\end{tabular}
+
+
+\begin{tabular}{|l|l|l|}
+\hline
+Author & Version & Change Report \\
+\hline
+Paul Hewson & 0.1 & Initial templating\\
+\hline
+Paul Hewson & 0.2 & Add EDA \\
+\hline
+Paul Hewson & 0.3 & Add modelling \\
+\hline
+Paul Hewson & 0.4 & Add SAE \\
+\hline
+Paul Hewson & 0.5 & Release draft\\
+\hline
+\end{tabular}                    
+
+                    
+{\color{blue}Prepared by:}
+\begin{itemize}
+\item[] Paul Hewson PhD CStat CSci
+\end{itemize}
+
+{\color{blue}Approved by:}
+%Laurence Oakes-Ash BSc ACMA CGMA MCIHT Director
+\begin{itemize}
+\item[] Project still in draft
+\end{itemize}
+
+\newpage
+
+\chapter{Project Aims}
+
+
+\section{Overview}
+
+
+\N Using data collected by the \emph{Monitor of Engagement with the Natural Environment (MENE survey)}, this project aims to determine whether Small Area Estimation (SAE) techniques can be used by Natural England to improve upon the accuracy and precision of survey-based estimates of the extent to which local populations engage with the natural environment. More specifically, it is concerned with quantifying improvements in accuracy and precision and determining what savings (in terms of effective sample sizes) can be achieved when applying SAE techniques at Local Authority level as well as illustrating the potential for use at the Middle Layer Census Super Output Area (MSOA).
+
+
+\N Specifically for this evaluation, the request was to model responses to ``Q1: Volume of visits per day over last 7 days'' and ``Q17: Frequency of visits during last 12 months''.   Whilst an interesting range of attitudinal and other questions are asked which may be associated with these responses, in order to conduct small area estimation we have to match predictor variables which ones which can be found in some auxiliary data.   The variables identified as being of potential interest were:
+
+\begin{itemize}
+\item Age
+\item Sex
+\item Ethnicity
+\item Marital status
+\item Working status
+\item Socio-economic group
+\item Lifestage
+\item Household size
+\item Children in household
+\item Adults in household
+\item Tenure
+\end{itemize}
+
+It is also possible to use the geographical information provided.
+
+\section{MENE survey data}
+
+\N As currently available to us, the MENE survey comprises 420,790 responses. These have been accumulated over \emph{nine} years of the survey.
+
+\begin{table}
+\begin{tabular}{lr}
+Dates & Responses \\
+March 2009 - February 2010 & 48,514\\
+March 2010 - February 2011 & 46,099\\
+March 2011 - February 2012 & 47,418\\
+March 2012 - February 2013 & 46,749\\
+March 2013 - February 2014 & 46,785\\
+March 2014 - February 2015 & 45,225\\
+March 2015 - February 2016 & 45,965\\ 
+March 2016 - February 2017 & 46,558\\
+March 2017 - February 2018 & 47,477
+\end{tabular}
+\caption{Number of responses in the MENE survey data by year of survey}
+\end{table}
+
+\input{EDA.tex}
+\input{Modelling.tex}
+
+
+\chapter{Summary of Method}
+
+\section{Small area estimation}
+
+\N Small Area Estimation (SAE) techniques have gained increasing acceptance over the last 3 decades\footnote{Rao, J.N.K. (2003) Small Area Estimation New York, Wiley}. There are a variety of well established approaches, the ones used here draw from model-based survey analysis and seek to ``pool'' evidence drawn from across a wider sample in order to ``enhance'' local estimates\footnote{Gelman, A. and Hill, J. (2007) Data Analysis Using Regression and Multilevel/Hierarchical Models Cambridge, CUP}.   They are considered to have some similarities with a post-stratification based approach in design based survey methods.
+
+
+\N Focusing on the behaviour of individual respondents nested within local authorities -- a classic ``multilevel'' scenario -- this study has adopted a conventional approach to dealing with hierarchically structured data with a simple count response; namely generalized linear mixed-effects regression modelling. It is an approach that aims to capture, as far as possible, the relationship between the response (or dependent variable) and a number of independent variables which include categorical variables describing individuals' tenure, age, sex, ethnicity, disability, marital status, work status, social classification, lifestage, adults / children in household, size of household, working status, car ownership and their self reported general health\footnote{In order to achieve some parsimony, different models draw upon different sets of categorical variables, for example age may be split into different bands.} The multilevel models are thus used to estimate individual level parameters that explain the relationship between these categorical variables and the response, whilst simultaneously allowing for a random intercept that is unique for each local authority and which describes any systematic authority-by-authority variation in the response that is not explained by the individual-level model.
+
+
+\N Thus for each individual $i$ in area $j$, the outcome reports the number of trips made to the natural environment in either the last week or the last year We model this as a Poisson distributed random variable so that:
+
+\begin{equation}
+Y_{ij} \sim Bernoulli(p_{ij})
+\end{equation}
+
+
+where the propensity that individual $i$ has reported a given number of trips is given by:
+
+\begin{equation}
+  logit(p_{ij}) = \boldsymbol{x}_{ij}^T \boldsymbol{\beta}
+\end{equation}
+
+
+where $\boldsymbol{\beta}$ denotes the model parameters and $\boldsymbol{x}$ denote individual characteristics recorded in the survey (such as age, gender, etc.) classified as categorical variables.
+
+
+\N Throughout this report we have assumed that the intercept term varies by local authority, but with the constraint that all these random intercepts are drawn from a common Normal distribution with zero mean and unknown variance.   We further extend this model to allow the local authority random intercepts themselves to have a linear predictor.  This could be used to capture contextual information that varies by residence rather than by individual. If this were to be undertaken the intercept for Local Authority $j$ would be given as: $\boldsymbol{z}_{j}^T \boldsymbol{\zeta}$ where $\boldsymbol{\zeta}$ denote the upper-level parameters and $\boldsymbol{z}$ denote area-level characteristics which describe various aspects of the local authority as a whole.  The linear predictors could be further nested to include, for instance, a term for smaller areas (such as MSOAs) within the local authority.
+
+
+\N Conventional (i.e. frequentist) approaches were employed for model exploration, but for the final model fit (used to generate the Local Authority estimates) a Bayesian approach was adopted. At this stage each of the ``fixed effects'' (the parameters relating various factors to the response) were drawn from a Normal distribution with a prior mean of zero and diffuse variance of 0.001.  The variance term for the random interceptwas assumed to be Uniform (0, 100).   These models have been fitted in R using the STAN software package\footnote{Stan Development Team (2018). RStan: the R interface to Stan. R package
+  version 2.18.2. http://mc-stan.org/.}.
+
+
+\N Having obtained estimates of the individual level parameters, it is possible to apply these to the ``known'' population structure of a given local authority to produce an estimate of the statistic of interest. This would, in effect, represent the expected response for that local authority given its specific socio-demographic composition. However, the strength of multilevel modelling is that, by estimating individual level effects for typical respondents of each type, the data is used to estimate how responses in each local authority differ from the expected national response. The resulting local authority ``random effects'' are then used, along with the individual level responses, to make ``small area predictions'' of the statistic of interest in each local authority. 
+
+
+\N By taking a modelling approach it is also possible to eliminate ``nuisance parameters''. For example, the trend over time for the years that the survey has been running is obviously of interest in its own right, but is not relevant to attempting to make small area predictions in the same time frame as the most recent data. Consequently, time can be regarded as a nuisance variable, and conditioned out of the model so that all years data can be used to esimate the relationship between predictors and the number of trips made.
+
+
+\N The Small Area Estimation approach requires that the number of people in each LA with each unique combination of characteristics used in the model is known, or can be estimated. Thus for the engagement models used it is necessary to know how many people are aged 16-24, own a car, are employed, owner occupiers and have a professional occupation -- and how many people there are with every other possible combination of characteristics used in the model . This data is obtained by taking the detailed socio-economic composition of Local Authorities from the 2011 Census Small Area Microdata (SAM) 5\% Sample, and constraining that distribution to mid-2016 age-sex population totals.  
+
+\section{Precision and accuracy}
+
+\N Our concern with \textsf{precision} refers to the level of certainty which the various methods attach to their estimates of self-reported engagment with the natural environment. These are conventionally understood with reference to the 95\% Confidence Intervals (CIs) associated with the various estimates. More precise measures will have narrower 95\% CIs, and any improvement in precision can be measured by comparing the width of SAE-based \textsf{modelled} estimate 95\% CIs with the original sample-based \textsf{direct} estimate 95\% CIs. Our \textsf{specific} goal here is to express the impact of SAE-based modelling in terms of 'effective sample sizes' and thus predict how much smaller the \emph{MENE survey} samples would need to be in order to achieve the precision achieved by design based survey methods.
+
+
+\N The measurement of \textsf{accuracy} is less straightforward in that we do not know with any certainty the \textsf{actual} number of people engaging with the natural environment in each Local Authority. There are thus no definitive ``correct'' values against which to compare the direct and modelled estimates produced using \emph{MENE survey} data. 
+
+
+
+
+\section{Engagement and LA-Level Estimates}
+
+
+\N Local Authority random effects, are obviously to be included in the model used to estimate rates of physical activity. These parameters, one for each local authority covered by the analysis effectively measure the extent to which responses in each area differ from what might be expected given the individual level (fixed effects) logistic regression model. These LA-specific intercepts effectively describe how much up or down the fixed effects logistic regression curve must move to best fit the observed data for each local authority.
+
+
+\N Few of the LA-level fixed effects would be regarded as statistically significant at the 95\% level in a conventional analysis.   However, this is a mechanism for capturing uncertainty in the modelled responses, and has the effect of reducing the level of uncertainty and hence increasing the precision of many estimates.   It would be possible to use better models, such as allowing the random effects to be spatially correlated. This may in turn increase the precision of the subsequent small area estimates.
+
+
+\N Having obtained ``fixed'' and local authority ``random effect'' parameter estimates, these can applied to socio-demographic data for Local Authorities and subsequently, by IPF, to MSOAs. These, as discussed above, are derived from 2011 Census Small Area Microdata, constrained to mid-2016 ONS age-sex totals in local authorities and MSOAs. Thus having determined how many people in each local authority are in each unique 'person-type' cell defined by the model, and having multiplied those sub-populations by the likelihood that those person-types will take a trip to the natural environment, the resulting counts are summed to obtain estimates of the overall number of people in each local authority who took a trip.
+
+
+
+\N As already intimated, by modelling the relationship between a range of independent covariates and the dependent variable (in this case whether or not individuals have made a trip in the last week/year) allowance is automatically made for any unintended and unknown bias in the sample. For instance, it is very unlikely that whether or not an individual has a self reported health status of ``bad'' will ever be used as either a sampling or weighting factor. Yet it is quite likely that among a large number of relatively small sub-samples (which, in this case, are the local authority subsets of the \textsf{MENE survey} there will be a number instances in which a particular sample is very unrepresentative of its underlying population. Given that general health has, as illustrated in , a strong (and of course entirely expected) impact on engagement with the environment, this inevitably means that at least some of the sub-samples will return biased sample-based direct estimates of local levels of physical activity.
+
+\input{SAE.tex}
+
+
+\chapter{Conclusions}
+
+\section{Synthetic small area estimates}
+
+\N The synthetic small area estimates for the two outcome variables (Q1 and Q17) are made available as a set of \texttt{.csv} files giving the ONS code for the small area (Local Authority and MSOA) along the posterior median and 95\% credible intervals for the estimated number of people who made a trip in the last week, or who made a trip more than once of twice in the last year.   The R code necessary to reproduce this analysis is available in a github repository.
+
+\N This feasibility study has demonstrated the viability of a small area approach to the MENE survey.   There are some challenges to be reconciled.   For example, ownership of a car is a strong predictor of engagement with the natural environment, yet does not seem to be recorded in the survey.   This reduces the precision by which small area estimation methods can predict a response.
+
+\N It would seem that, using appropriate small area estimation methods, a reduction in sample size is possible.  The challenge in this work is that it assumes that the model is essentially correct.   It assumes that specific person types generally behave the same wherever they are in the country.  This is rarely a popular assumption with local authorities being judged on the output of such a modelling exercise.  It is possible with more judicious modelling (such as spatial random effects models using the postcode sector of the respondent) to better estimate local authority specific random effects. Clearly this requires both further technical work and further discussions with stakeholders as to the likely acceptablility of such modelling.   Similarly, producing more granular geographical results such as MSOA level small area estimates, while feasible perhaps merits further work looking at local specific effects.
+
+\chapter{Appendix}
+
+\section{Technical clarifications}
+
+\input{../doc/odds_ratios.tex}
+
+\bibliography{../doc/refs}
+
+\end{document}
