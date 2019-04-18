@@ -1,0 +1,424 @@
+\SweaveOpts{prefix.string=figs/sae}
+
+<<prep, echo=FALSE, results=hide>>=
+library(rpostgis)
+library(xtable)
+library(arm)
+library(hash)
+drv <- dbDriver("PostgreSQL")
+con <- dbConnect(drv, dbname = "gis")
+
+mene.df <- dbGetQuery(con, "select q1, q17, tenure, age, sex, ethnicity, disability,
+                            marital, workstat, seg, segall, lifestage, physical,
+                            adults_in_hh, child_in_hh, hh_size, workstat,
+                            car, generalhealth, year, residence_localauthority
+                       from staging.natural_england_mene_respondents_y1_9;")
+mene.df$age = as.factor(mene.df$age)
+mene.df$q1_binary <- 0
+mene.df$q1_binary[mene.df$q1 > 0] <- 1
+mene.df$q17_binary <- 1
+mene.df$q17_binary[mene.df$q17 == "Never"] <- 0
+mene.df$q17_binary[mene.df$q17 == "Once or twice"] <- 0
+mene.df$q17_binary[mene.df$q17 == " "] <- NA
+mene.df$q17 <- factor(mene.df$q17, levels=c("Never", "Once or twice", "Once every 2-3 months", "Once or twice a month", "Once a week", "Several times a week", "Every day", "More than once per day"))
+mene.df$sex = as.factor(mene.df$sex)
+mene.df$seg = as.factor(mene.df$seg)
+mene.df$segall = as.factor(mene.df$segall)
+mene.df$tenure = as.factor(mene.df$tenure)
+mene.df$ethnicity = as.factor(mene.df$ethnicity)
+mene.df$disability = as.factor(mene.df$disability)
+mene.df$marstat = as.factor(mene.df$marital)
+mene.df$adults_in_hh <- as.factor(mene.df$adults_in_hh)
+mene.df$child_in_hh <- as.factor(mene.df$child_in_hh)
+mene.df$hh_size <- as.factor(mene.df$hh_size)
+mene.df$workstat <- as.factor(mene.df$workstat)
+mene.df$car <- as.factor(mene.df$car)
+mene.df$genhealth <- factor(mene.df$generalhealth, levels = c("Don't know", "Very bad", "Bad", "Fair", "Good", "Very good"))
+mene.df$car[!(mene.df$car == "Yes" | mene.df$car == "No")] <- NA
+mene.df$genhealth[mene.df$genhealth == "Don't know"] <- NA
+mene.df$la <- mene.df$residence_localauthority
+duffer <- c(" ", "355", "356", "358", "359", "361", "362", "367", "368", "371", "372",
+"373", "374", "375")  
+for (duff in duffer) {mene.df$la[mene.df$la == duff] <- NA}
+mene.df$la <- as.factor(mene.df$la)
+mene.df$la_number <- as.numeric(mene.df$la)
+@
+
+<<model_fit, results=hide, echo=FALSE>>=
+y = mene.df$q1_binary
+current.na.action <- options('na.action')
+options(na.action='na.pass')
+X = model.matrix(~age + sex + car + seg + genhealth, mene.df)
+dim(X)
+X <- cbind(X, mene.df$la_number)
+dim(X)
+head(X)
+xy = cbind(y, X)
+dim(xy)
+xy <- na.omit(xy)
+dim(xy)
+y = xy[,1]
+X = xy[,-1]
+la_index <- xy[,ncol(xy)]
+X <- X[,-ncol(X)]
+head(X)
+options(na.action=current.na.action)
+stan_data = list(y=as.integer(y), X=X, N=length(y), K=dim(X)[2], la_index=la_index, N_las=max(la_index))
+library("rstan")
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+# fit <- stan(file = '../stan/simple_hierarchical_bernoulli_glm.stan', data = stan_data, chains=2)
+
+# m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm.stan')
+m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm.stan')
+f <- optimizing(m, data = stan_data, hessian = TRUE)
+post_mean = f$par[1:17]
+post_mean_la = f$par[18:369]
+post_var = sqrt(1 / (-1 * diag(f$hessian)[1:17]))
+post_var_la = sqrt(1 / (-1 * diag(f$hessian)[18:369]))
+names(post_mean) <- colnames(X)
+names(post_var) <- names(post_mean)
+cbind(post_mean, post_var)
+
+
+dict <- hash(c(1:length(levels(mene.df$la))), levels(mene.df$la))
+the_names <- vector(,length(unique(la_index)))
+for (i in la_index) {the_names[i] = values(dict, i)}
+names(post_mean_la) <- the_names
+cbind(post_mean_la, post_var_la)
+
+
+
+
+@
+
+
+\subsection{Fitting a model to the entire dataset}
+
+\N The first set of plots summarise the results of fitting a plot to the entire dataset.   The rationale is that these are the most precise estimates which can be obtained and therefore act as a benchmark.   The obvious disadvantages are that it may be too simplistic to use a simple random effect for year as a way of accomodating changes over time and secondly, that not all variables seem to be available in all years.  Figure~\ref{ref_all} depicts a so-called ``caterpillar plot'', a summary of the 95\% posterior credible interval of the local authority random effects.   There are some data anomolies (the reason we see infinitely wide intervals) but this picture is intended as a way of evaluating the typical width of a credible interval.
+
+
+\begin{figure}
+<<cat_plot_full, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+n = length(post_mean_la)
+orderit <- order(post_mean_la)
+plot(post_mean_la[orderit], c(1:n), pch=16, xlim = c(-15, 15), xlab="Log odds", ylab="", yaxt="n")
+arrows(post_mean_la[orderit], c(1:n), post_mean_la[orderit] + 1.96 * post_var_la[orderit], c(1:n), angle=0.0001, col="grey")
+arrows(post_mean_la[orderit], c(1:n), post_mean_la[orderit] - 1.96 * post_var_la[orderit], c(1:n), angle=0.0001, col="grey")
+points(post_mean_la[orderit], c(1:n), col="red")
+@
+\label{ref_all}
+\caption{Local Authority Random effects illustrated}
+\end{figure}
+
+\N Figure~\ref{ref_some} is an exploded view of the central part of figure~\ref{ref_all} created for illustrative purposes.  It shows a summary of the posterior 95\% credible interval for an arbitrary ten local authorities.  The precision of the final small area estimates is a function of the width of these intervals.
+
+\begin{figure}
+<<catplot_full_expanded, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+plot(post_mean_la[orderit][101:110], c(1:10), pch=16, xlim = c(-2, +2), xlab="Log odds", ylab="", yaxt="n", bty="n")
+arrows(post_mean_la[orderit][101:110], c(1:10), post_mean_la[orderit][101:110] + 1.96 * post_var_la[orderit][101:110], c(1:10), angle=0.0001, col="grey")
+arrows(post_mean_la[orderit][101:110], c(1:10), post_mean_la[orderit][101:110] - 1.96 * post_var_la[orderit][101:110], c(1:10), angle=0.0001, col="grey")
+points(post_mean_la[orderit][101:110], c(1:10), col="red")
+text(-1.5, c(1:10), the_names[orderit][101:110], cex=0.75, pos=2, xpd=TRUE)
+@
+\label{ref_some}
+\caption{Exploded view of posterior random effects for some authorities}
+\end{figure}
+
+
+
+\subsection{2017/2018 only}
+
+\N We next concentrate our attention on examining the results of model fitting to the 2017/2018 data only. This is because this will best inform ideas of sample size for future use.
+
+<<fit_model_2017_2018, echo=FALSE, results=hide>>=
+# mene_sample.df <- mene_sample.df[sample(nrow(mene.df),100),]
+mene_sample.df <- mene.df[mene.df$year == "Y1718",]
+mene_sample.df$la <- mene_sample.df$residence_localauthority
+duffer <- c(" ", "355", "356", "358", "359", "361", "362", "367", "368", "371", "372",
+"373", "374", "375")  
+for (duff in duffer) {mene_sample.df$la[mene_sample.df$la == duff] <- NA}
+mene_sample.df$la <- as.factor(mene_sample.df$la)
+mene_sample.df$la_number <- as.numeric(mene_sample.df$la)
+y = mene_sample.df$q1_binary
+current.na.action <- options('na.action')
+options(na.action='na.pass')
+X = model.matrix(~age + sex + seg + genhealth, mene_sample.df)
+dim(X)
+X <- cbind(X, mene_sample.df$la_number)
+dim(X)
+head(X)
+xy = cbind(y, X)
+dim(xy)
+xy <- na.omit(xy)
+dim(xy)
+y = xy[,1]
+X = xy[,-1]
+la_index <- xy[,ncol(xy)]
+X <- X[,-ncol(X)]
+head(X)
+options(na.action=current.na.action)
+stan_data = list(y=as.integer(y), X=X, N=length(y), K=dim(X)[2], la_index=la_index, N_las=max(la_index))
+library("rstan")
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+# fit <- stan(file = '../stan/simple_hierarchical_bernoulli_glm.stan', data = stan_data, chains=2)
+
+# m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm.stan')
+m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm.stan')
+f <- optimizing(m, data = stan_data, hessian = TRUE)
+post_mean = f$par[1:15]
+post_mean_la = f$par[16:360]
+post_var = sqrt(1 / (-1 * diag(f$hessian)[1:15]))
+post_var_la = sqrt(1 / (-1 * diag(f$hessian)[16:360]))
+names(post_mean) <- colnames(X)
+names(post_var) <- names(post_mean)
+cbind(post_mean, post_var)
+
+
+dict <- hash(c(1:length(levels(mene_sample.df$la))), levels(mene_sample.df$la))
+the_names <- vector(,length(unique(la_index)))
+for (i in la_index) {the_names[i] = values(dict, i)}
+names(post_mean_la) <- the_names
+cbind(post_mean_la, post_var_la)
+@
+
+
+\N Figure~\ref{ref_1718} depicts the overall ``caterpillar plot'' for all authorities, and figure~\ref{ref_1718_some} shows the exploded view. It appears that the intervals are indeed wider than the case for the all-data model.
+
+\begin{figure}
+<<catplot_2018, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+n <- length(post_mean)
+plot(post_mean, c(1:n), pch=16, xlim = c(-5, 5), xlab="Log odds", ylab="", yaxt="n", bty="n")
+arrows(post_mean, c(1:n), post_mean + 1.96 * post_var, c(1:n), angle=0.0001, col="grey")
+arrows(post_mean, c(1:n), post_mean - 1.96 * post_var, c(1:n), angle=0.0001, col="grey")
+points(post_mean, c(1:n), col="red")
+text(-3, c(1:n), names(post_mean), pos=2, xpd=TRUE)
+@
+\label{ref_1718}
+\caption{Individual ``fixed'' effects for survey year March 2017 to February 2018}
+\end{figure}
+
+\begin{figure}
+<<catplot_2018, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+orderit <- order(post_mean_la)
+length(orderit)
+plot(post_mean_la[orderit], c(1:345), pch=16, xlim = c(-15, +15), xlab="Log odds", ylab="", yaxt="n")
+arrows(post_mean_la[orderit], c(1:345), post_mean_la[orderit] + 1.96 * post_var_la[orderit], c(1:345), angle=0.0001, col="grey")
+arrows(post_mean_la[orderit], c(1:345), post_mean_la[orderit] - 1.96 * post_var_la[orderit], c(1:345), angle=0.0001, col="grey")
+points(post_mean_la[orderit], c(1:345), col="red")
+@
+\label{ref_1718_some}
+\caption{Local authority specific random effects for survey year March 2017 to February 2018}
+\end{figure}
+
+\newpage
+
+\N It is of interest also to consider the effect on the estimate of the individual level ``fixed effects''.  Figure~\ref{feff} summarises the posterior credible interval for the parameter estimates relating to individual characterstics.   These are as expected given the initial model screening.  There is a greater tendency to engage with the natural environment amongst those of better health, and the younger, and higher social  grouping. 
+
+\begin{figure}
+<<catplot_2018_selection, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+plot(post_mean_la[orderit][101:110], c(1:10), pch=16, xlim = c(-4, +4), xlab="Log odds", ylab="", yaxt="n", bty="n")
+arrows(post_mean_la[orderit][101:110], c(1:10), post_mean_la[orderit][101:110] + 1.96 * post_var_la[orderit][101:110], c(1:10), angle=0.0001, col="grey")
+arrows(post_mean_la[orderit][101:110], c(1:10), post_mean_la[orderit][101:110] - 1.96 * post_var_la[orderit][101:110], c(1:10), angle=0.0001, col="grey")
+points(post_mean_la[orderit][101:110], c(1:10), col="red")
+text(-3.5, c(1:10), the_names[orderit][101:110], cex=0.75, pos=2, xpd=TRUE)
+@
+\label{feff}
+\caption{Expanded view of some local authority random effects from 2017/2018 survey year}
+\end{figure}
+
+\newpage
+\subsection{Exploring the effect of reduced sample size}
+
+\N We next consider taking a random subsample of the 2017/2018 data. Results presented here show an 80\% sample and then a 50\% sample.   It can be seen that the intervals are widening with the 50\% sample.
+
+<<model_fit_0_8, echo=FALSE, results=hide>>=
+mene_sample.df <- mene.df[mene.df$year == "Y1718",]
+mene_sample.df <- mene_sample.df[sample(nrow(mene_sample.df),dim(mene_sample.df)[1] * 0.8),]
+dim(mene_sample.df)
+mene_sample.df$la <- mene_sample.df$residence_localauthority
+duffer <- c(" ", "355", "356", "358", "359", "361", "362", "367", "368", "371", "372",
+"373", "374", "375")  
+for (duff in duffer) {mene_sample.df$la[mene_sample.df$la == duff] <- NA}
+mene_sample.df$la <- as.factor(mene_sample.df$la)
+mene_sample.df$la_number <- as.numeric(mene_sample.df$la)
+y = mene_sample.df$q1_binary
+current.na.action <- options('na.action')
+options(na.action='na.pass')
+X = model.matrix(~age + sex + seg + genhealth, mene_sample.df)
+dim(X)
+X <- cbind(X, mene_sample.df$la_number)
+dim(X)
+head(X)
+xy = cbind(y, X)
+dim(xy)
+xy <- na.omit(xy)
+dim(xy)
+y = xy[,1]
+X = xy[,-1]
+la_index <- xy[,ncol(xy)]
+X <- X[,-ncol(X)]
+head(X)
+options(na.action=current.na.action)
+stan_data = list(y=as.integer(y), X=X, N=length(y), K=dim(X)[2], la_index=la_index, N_las=max(la_index))
+library("rstan")
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+# fit <- stan(file = '../stan/simple_hierarchical_bernoulli_glm.stan', data = stan_data, chains=2)
+
+# m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm.stan')
+m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm.stan')
+f <- optimizing(m, data = stan_data, hessian = TRUE)
+post_mean = f$par[1:15]
+post_mean_la = f$par[16:360]
+post_var = sqrt(1 / (-1 * diag(f$hessian)[1:15]))
+post_var_la = sqrt(1 / (-1 * diag(f$hessian)[16:360]))
+names(post_mean) <- colnames(X)
+names(post_var) <- names(post_mean)
+cbind(post_mean, post_var)
+
+
+dict <- hash(c(1:length(levels(mene_sample.df$la))), levels(mene_sample.df$la))
+the_names <- vector(,length(unique(la_index)))
+for (i in la_index) {the_names[i] = values(dict, i)}
+names(post_mean_la) <- the_names
+cbind(post_mean_la, post_var_la)
+@
+
+\begin{figure}
+<<catplot_2018, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+n <- length(post_mean)
+plot(post_mean, c(1:n), pch=16, xlim = c(-5, 5), xlab="Log odds", ylab="", yaxt="n", bty="n")
+arrows(post_mean, c(1:n), post_mean + 1.96 * post_var, c(1:n), angle=0.0001, col="grey")
+arrows(post_mean, c(1:n), post_mean - 1.96 * post_var, c(1:n), angle=0.0001, col="grey")
+points(post_mean, c(1:n), col="red")
+text(-3, c(1:n), names(post_mean), pos=2, xpd=TRUE)
+@
+\caption{Individual ``fixed'' effects for survey year March 2017 to February 2018, 80\% sample}
+\end{figure}
+
+\begin{figure}
+<<catplot_0_8, fig=TRUE, echo=FALSE, results=hide, width=6, height=8>>=
+orderit <- order(post_mean_la)
+n <- length(orderit)
+plot(post_mean_la[orderit], c(1:n), pch=16, xlim = c(-10, 10), xlab="Log odds", ylab="", yaxt="n")
+arrows(post_mean_la[orderit], c(1:n), post_mean_la[orderit] + 1.96 * post_var_la[orderit], c(1:n), angle=0.0001, col="grey")
+arrows(post_mean_la[orderit], c(1:345), post_mean_la[orderit] - 1.96 * post_var_la[orderit], c(1:n), angle=0.0001, col="grey")
+points(post_mean_la[orderit], c(1:n), col="red")
+@
+\caption{Posterior 95\% credible intervals from fitting models to randomly selected 80\% subset of the 2017/2018 data}
+\end{figure}
+
+
+\begin{figure}
+<<cat_plot_exploded_2018_80, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+plot(post_mean_la[orderit][101:110], c(1:10), pch=16, xlim = c(-4, +4), xlab="Log odds", ylab="", yaxt="n", bty="n")
+arrows(post_mean_la[orderit][101:110], c(1:10), post_mean_la[orderit][101:110] + 1.96 * post_var_la[orderit][101:110], c(1:10), angle=0.0001, col="grey")
+arrows(post_mean_la[orderit][101:110], c(1:10), post_mean_la[orderit][101:110] - 1.96 * post_var_la[orderit][101:110], c(1:10), angle=0.0001, col="grey")
+points(post_mean_la[orderit][101:110], c(1:10), col="red")
+text(-3.5, c(1:10), the_names[orderit][101:110], cex=0.75, pos=2, xpd=TRUE)
+@
+\caption{Selected zoom in to posterior 95\% credible intervals from fitting models to randomly selected 80\% subset of the 2017/2018 data}
+\end{figure}
+
+
+
+
+<<model_fit_2018_50, echo=FALSE, results=hide>>=
+mene_sample.df <- mene.df[mene.df$year == "Y1718",]
+mene_sample.df <- mene_sample.df[sample(nrow(mene_sample.df),dim(mene_sample.df)[1] * 0.5),]
+dim(mene_sample.df)
+mene_sample.df$la <- mene_sample.df$residence_localauthority
+duffer <- c(" ", "355", "356", "358", "359", "361", "362", "367", "368", "371", "372",
+"373", "374", "375")  
+for (duff in duffer) {mene_sample.df$la[mene_sample.df$la == duff] <- NA}
+mene_sample.df$la <- as.factor(mene_sample.df$la)
+mene_sample.df$la_number <- as.numeric(mene_sample.df$la)
+y = mene_sample.df$q1_binary
+current.na.action <- options('na.action')
+options(na.action='na.pass')
+X = model.matrix(~age + sex + seg + genhealth, mene_sample.df)
+dim(X)
+X <- cbind(X, mene_sample.df$la_number)
+dim(X)
+head(X)
+xy = cbind(y, X)
+dim(xy)
+xy <- na.omit(xy)
+dim(xy)
+y = xy[,1]
+X = xy[,-1]
+la_index <- xy[,ncol(xy)]
+X <- X[,-ncol(X)]
+head(X)
+options(na.action=current.na.action)
+stan_data = list(y=as.integer(y), X=X, N=length(y), K=dim(X)[2], la_index=la_index, N_las=max(la_index))
+library("rstan")
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+# fit <- stan(file = '../stan/simple_hierarchical_bernoulli_glm.stan', data = stan_data, chains=2)
+
+# m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm.stan')
+m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm.stan')
+f <- optimizing(m, data = stan_data, hessian = TRUE)
+post_mean = f$par[1:15]
+post_mean_la = f$par[16:360]
+post_var = sqrt(1 / (-1 * diag(f$hessian)[1:15]))
+post_var_la = sqrt(1 / (-1 * diag(f$hessian)[16:360]))
+names(post_mean) <- colnames(X)
+names(post_var) <- names(post_mean)
+cbind(post_mean, post_var)
+
+
+dict <- hash(c(1:length(levels(mene_sample.df$la))), levels(mene_sample.df$la))
+the_names <- vector(,length(unique(la_index)))
+for (i in la_index) {the_names[i] = values(dict, i)}
+names(post_mean_la) <- the_names
+cbind(post_mean_la, post_var_la)
+
+
+
+
+@
+
+\begin{figure}
+<<catplot_2018_50_full, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+orderit <- order(post_mean_la)
+n <- length(orderit)
+plot(post_mean_la[orderit], c(1:n), pch=16, xlim = c(-15, +15), xlab="Log odds", ylab="", yaxt="n")
+arrows(post_mean_la[orderit], c(1:n), post_mean_la[orderit] + 1.96 * post_var_la[orderit], c(1:n), angle=0.0001, col="grey")
+arrows(post_mean_la[orderit], c(1:345), post_mean_la[orderit] - 1.96 * post_var_la[orderit], c(1:n), angle=0.0001, col="grey")
+points(post_mean_la[orderit], c(1:n), col="red")
+@
+\caption{Posterior 95\% credible intervals from fitting models to randomly selected 50\% subset of the 2017/2018 data}
+\end{figure}
+
+
+\begin{figure}
+<<catplot_2018_50_zoom, fig=TRUE, echo=FALSE, results=hide, width=6, height=8>>=
+plot(post_mean_la[orderit][101:110], c(1:10), pch=16, xlim = c(-4, +4), xlab="Log odds", ylab="", yaxt="n", bty="n")
+arrows(post_mean_la[orderit][101:110], c(1:10), post_mean_la[orderit][101:110] + 1.96 * post_var_la[orderit][101:110], c(1:10), angle=0.0001, col="grey")
+arrows(post_mean_la[orderit][101:110], c(1:10), post_mean_la[orderit][101:110] - 1.96 * post_var_la[orderit][101:110], c(1:10), angle=0.0001, col="grey")
+points(post_mean_la[orderit][101:110], c(1:10), col="red")
+text(-3.5, c(1:10), the_names[orderit][101:110], cex=0.75, pos=2, xpd=TRUE)
+@
+\caption{Selected zoom in to posterior 95\% credible intervals from fitting models to randomly selected 50\% subset of the 2017/2018 data}
+\end{figure}
+
+\begin{figure}
+<<catplot_2018, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+n <- length(post_mean)
+plot(post_mean, c(1:n), pch=16, xlim = c(-5, 5), xlab="Log odds", ylab="", yaxt="n", bty="n")
+arrows(post_mean, c(1:n), post_mean + 1.96 * post_var, c(1:n), angle=0.0001, col="grey")
+arrows(post_mean, c(1:n), post_mean - 1.96 * post_var, c(1:n), angle=0.0001, col="grey")
+points(post_mean, c(1:n), col="red")
+text(-3, c(1:n), names(post_mean), pos=2, xpd=TRUE)
+@
+\caption{Individual ``fixed'' effects for survey year March 2017 to February 2018, 50\% sample}
+\end{figure}
+

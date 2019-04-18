@@ -1,0 +1,75 @@
+\SweaveOpts{prefix.string=figs/modelling}
+<<prep, echo=FALSE, results=hide>>=
+source("../R_script/get_mene.R")
+source("../R/sanitize_mene.R")
+mene.df <- mene_factors(mene.df)
+mene.df <- mene_code_q1(mene.df)
+mene.df <- mene_code_q17(mene.df)
+
+require(arm)
+@
+ 
+ 
+\section{Exploratory Modelling}
+
+\N For the purposes of the feasibility study, given the complexity of dealing with nine years of survey data\footnote{There are issues with missing data and so on which are associated with the year/wave of the survey}, an automatic variable selection method based on AIC was applied from the MASS package\footnote{Venables, W. N. \& Ripley, B. D. (2002) Modern Applied Statistics with S. Fourth Edition. Springer, New York. ISBN 0-387-95457-0}, namely using the \texttt{stepAIC()} function.   The aim is to select a model which can provide an adequate representation of the survey data and which is sufficient for small area estimation.
+ 
+\subsection{Model fitting to Q1 (trips made in the previous week)}
+  
+\N The response to MENE survey Question 1 records the number of trips taken in the past seven days.   Having explored this variable carefully, it would appear to have the properties of a Zero Inflated Poisson variable\footnote{Hall, Daniel B. ``Zero???inflated Poisson and binomial regression with random effects: a case study.'' Biometrics 56.4 (2000): 1030-1039.}. However, for the purposes of this feasibility study, we have modelled it as a binary indicator, equal to $0$ if no trips had been made in the previous seven days and $1$ if at least one trip had been made in the last seven days.
+
+\N All the available predictors were examined, including two way interactions.   Parameter estimates from the finally selected model are given in table~\ref{m1_coefs} and a visual summary is given in figure~\ref{coefplot_q1} (along with 95\% and 90\% confidence intervals for the parameter estimates).
+
+\begin{figure}
+<<last_week, echo=FALSE, results=hide, fig=TRUE>>=  
+m1 <- glm(q1_binary ~ age + tenure + seg + car + as.factor(year), 
+          family = binomial, data = mene.df[mene.df$year != "Y1617" | mene.df$year != "Y1718",])
+coefplot(m1, mar=c(1, 7, 4, 1), main="")
+@
+\label{coefplot_q1}
+\caption{Parameter estimates from model fitted to Dichotomised Q1 (trips taken in the last seven days)}
+\end{figure}
+
+<<last_week_tab, echo=FALSE, results=tex, fig=FALSE, width=5, height=6>>=
+x.m1 <- xtable(summary(m1), caption="Trips in last week, parameter estimates", label="m1_coefs", auto=TRUE)
+digits(x.m1) <- 3
+print(x.m1, include.colnames=TRUE, format.args=list(big.mark=","))
+@
+
+\N To illustrate what these estimates are saying, the probability of having made a trip in the last seven days, for a reference case of a person 16-24 year old, with a Mortgage, self reporting very bad health, in social group AB and without a car would be $\frac{\exp(-0.903127)}{1 + \exp(-0.90312)}$ or about $0.29$.   For the same reference case but for a respondent with a car this increases to $\frac{\exp(-0.903127 + 0.437113)}{1 + exp(-0.903127 + 0.437113)} = 0.39$
+
+\N The effects of different predictors are readily seen in figure~\ref{coefplot_q1}.   This shows the log odds ratio of having made a trip in the last seven days increased where there was access to a car relative to not having a car, progressively decreased as the social class went from group C1 to C2 to DE relative to group AB.   Likewise, relative to those in the reference case of Very Bad health, the odds of taking a trip in the last five years increased with improving health.   Those in rented accomodation were less likely to make a trip, and those aged over 65 were less likely to make a trip than the reference case of 16-24.
+
+\clearpage
+\subsection{Model fitting to Q17}
+  
+\N The response to question 17 was an estimate of the frequency of trips made in the previous year.   A summary of responses is given in table~\ref{mene_q17}.
+
+<<mene_q17, fig=FALSE, results=tex, echo=FALSE>>=
+mene_q17 <- xtable(with(mene.df, xtabs(~q17, exclude=NULL, na.action=na.pass)), caption="MENE Responses to Q17", label="mene_q17", auto=TRUE)
+print(mene_q17, include.colnames=FALSE, format.args=list(big.mark=","))
+@
+
+\N As with Question 1 (trips made in the previous week) more complex modelling is certainly possible. Ideally, something like a proportional odds logistic regression model could be used to respect the order of the responses\footnote{Brant, Rollin. "Assessing proportionality in the proportional odds model for ordinal logistic regression." Biometrics (1990): 1171-1178.}. This does however complicate the modelling process, removes the availability of quick variable selection methods and introduces a large number of additional assumptions which have to be checked.  Therefore, for the purposes of a feasibility study we have again dichotomised the output, assigning $0$ to responses which indicated that they ``Never'' made trips of that they only made trips ``"Once or twice''.   All answers indicating a higher frequency of trips were assigned $1$. 
+
+\N A visual summary of the parameter estimates from the final model is given in figure~\ref{coefplot_q17} (along with 95\% and 90\% confidence intervals for the parameter estimates).   A more conventional tabulation of the parameter estimates is given in table~\ref{m17_coefs}
+
+\begin{figure}
+<<last_year, echo=FALSE, results=hide, fig=TRUE, width=5, height=6>>=  
+m17 <- glm(q17_binary ~ age + tenure + genhealth + seg + car, family = binomial, data = mene.df)
+coefplot(m17, mar=c(1, 7, 4, 1), main = "")
+@
+\label{coefplot_q17}
+\caption{Parameter estimates from model fitted to Dichotomised Q17 (reported trips in the last year was higher than once or twice)}
+\end{figure}
+
+\N The probability of having made a trip more than once or twice in the last year, for a reference case of 16-24 year old, with a Mortgage of very bad health in social group AB without a car $\frac{\exp(0.9669)}{1 + \exp(0.9669)}$ or about $0.72$.   For the same reference case but with a car this increases to $\frac{\exp(-0.903127 + 0.5939)}{1 + exp(-0.903127 + 0.5939)} = 0.82$
+
+<<last_year_tab, echo=FALSE, results=tex, fig=FALSE>>=
+x.m17 <- xtable(summary(m17), caption="Trips in last year, parameter estimates", label="m17_coefs", auto=TRUE)
+digits(x.m17) <- 3
+print(x.m17, include.colnames=TRUE, format.args=list(big.mark=","))
+@
+
+\N Figure~\ref{coefplot_q17} shows that the odds of having made a trip in the last seven days increased where there was access to a car relative to not having a car, were progressively lower as the social class went from groupC12 to DE relative to group AB.   Likewise, relative to those in the reference case of Very Bad health, the odds of taking a trip in the last five years increased with improving health.   Those in rented accomodation were less likely to make a trip, and those aged over 65 were less likely to make a trip.
+
