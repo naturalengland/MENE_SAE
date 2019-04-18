@@ -31,7 +31,8 @@ mene_code_q17 <- function(mene.df){
   mene.df$q17_binary <- 1
   mene.df$q17_binary[mene.df$q17 == "Never"] <- 0
   mene.df$q17_binary[mene.df$q17 == "Once or twice"] <- 0
-  mene.df$q17_binary[mene.df$q17 == " "] <- NA
+  mene.df$q17_binary[mene.df$q17 == "Once every 2-3 months"] <- 0
+    mene.df$q17_binary[mene.df$q17 == " "] <- NA
   mene.df$q17 <- factor(mene.df$q17, levels=c("Never", "Once or twice", "Once every 2-3 months", "Once or twice a month", "Once a week", "Several times a week", "Every day", "More than once per day"))
   return(mene.df)
 }
