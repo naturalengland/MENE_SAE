@@ -1,0 +1,160 @@
+\subsection{Odds and odds ratios}
+
+
+\fbox{
+\begin{minipage}[t]{0.9\textwidth}
+The proportion is a well recognised summary metric:
+  
+\begin{displaymath}
+Proportion = \frac{\mbox{Number of individuals responding with `yes'}}{
+      \mbox{Total number of individuals surveyed}}
+\end{displaymath}
+
+In many fields (including medicine) it is common to use odds as a
+summary metric:
+
+\begin{displaymath}
+Odds = \frac{\mbox{Number of individuals responding with `yes'}}{
+    \mbox{Number of individuals responding with `no'}}
+\end{displaymath}
+\end{minipage}
+}
+
+
+The odds ratio is a less commonly used summary measure of treatment /
+exposure effect.   It is defined as:
+
+\fbox{
+\begin{minipage}[t]{0.9\textwidth}
+\begin{displaymath}
+Odds\ ratio = \frac{\mbox{Odds of `yes' for group A}}{
+  \mbox{Odds of `yes' for group B}}
+\end{displaymath}
+\end{minipage}
+}
+
+An odds ratio with value of (almost) 0 indicates that the
+odds of replying `yes' for group `A' are either very low (almost zero
+respondents replied `yes') or the odds of replying `yes' for group `B' are
+very high (almost every respondent replied `yes') or both.   An odds ratio of 1
+indicates that the odds of replying `yes' are the same in both groups,
+regardless of the relative number in each group who replied `yes'.   Odds ratios
+above 1 indicate that relatively more respondents in group `A' replied yes
+than did respondents in group `B'.
+
+The log-odds ratio is the (natural) logarithm of the odds ratio.
+
+\fbox{
+  \begin{minipage}[t]{0.9\textwidth}
+\begin{displaymath}
+ Log Odds\ ratio = \log_e \left( \frac{\mbox{Odds of `yes' for group A}}{
+     \mbox{Odds of `yes' for group B}} \right)
+\end{displaymath}
+\end{minipage}
+}
+
+The effect of using a log-odds ratio might be for visual or interpretative
+reasons.   An odds ratio of 0.5 and an odds ratio of 2 indicate that the odds
+of replying `yes' in group `A' are either half of twice the odds of group `B'.
+There is a symmetry here which cannot be seen if these effects were to be
+plotted.   Another reason, is that standard modelling approaches naturally
+work with the log-odds ratio for their own reasons.
+
+  
+\fbox{
+\begin{minipage}[t]{0.9\textwidth}
+  As a point of clarification for later, it is possible to convert a proportion
+  into an odds using formula~\ref{odds_prop}
+
+\begin{equation}
+Odds = \frac{Proportion}{1-Proportion}
+\label{odds_prop}
+\end{equation}
+\end{minipage}
+}
+
+
+
+\subsection{Logistic regression models}
+
+This analysis considers two dichotomous outputs, namely whether a respondent
+indicated that they have made at least one trip in the last week, or whether
+over the course of the previous year they had made more than one trip a
+month.   Denoting the number of individuals by $n$, and a single
+individual with a subscript $i$ (where $i = 1, \ldots, n$).
+for individual $i$, the response variables are created as:
+
+\textbf{Question 1}
+
+
+\begin{displaymath}
+Y_i = \left\{ \begin{array}{rll}
+1 & \mbox{ if } &\mbox{ if one or more trips have been made in the last week}\\
+0 & & \mbox{otherwise}
+\end{array} \right.
+\end{displaymath}
+
+\textbf{Question 17}
+
+
+\begin{displaymath}
+Y_i = \left\{ \begin{array}{rll}
+             1 & \mbox{ if } &\mbox{ if trips have been made more than
+                                     once a month in the last year}\\
+0 & & \mbox{otherwise}
+\end{array} \right.
+\end{displaymath}
+
+
+For technical reasons, the standard statistical method for fitting a model to
+such data is the so-called logistic regression.   There are three elements
+to these models.
+
+\begin{enumerate}
+\item Assume that the response variable $Y_i$ is a realisation of a
+  Bernoulli random variable where the probability $Y=1$ is given by $\theta_i$.
+\item Next assume that there it is resonable to relate the outcome
+  to a standard linear predictor of the
+  form $\eta_i = \beta_0 + \beta_1 x_{i1} + \ldots + \beta_p x_{ip}$ where
+  $\beta_j$ (with the subscript $j=1, \ldots, p$ denoting a distinct predictor
+  variable from $1$ to $p$) are the parameters to be estimated and
+  $\boldsymbol{x_i}=(x_{i1}, \ldots, x_{ip})$ are the values of the predictor
+  variables for individual $i$.
+\item In many ways, the $\eta_i$ values are similar to the $\hat{y}$ values
+  of a standard linear regression.  However, we need a way of mapping these
+  linear predictor values onto the probability $\theta_i$ that individual $i$
+  reported having taken trip in the last week, or a trip more than once a month
+  in the last year.   To do this, a so-called logistic link function is used.
+\end{enumerate}
+
+\begin{equation}
+\log \left( \frac{\theta_i}{1-\theta_i} \right) = \eta_i
+\label{logit_link}
+\end{equation}
+
+Equation~\ref{logit_link} is referred to as the \emph{logistic link} function
+and is the reason these models are referred to as ``logistic regression''
+models. It is something of a default in medical research where they have been
+used for over a century. In 1972 \cite{nelder1972generalized} developed a
+flexible framework for a range of related models.   From the point of view
+of someone wishing to interpret the parameter estimates from a logistic
+regression model, it can be seen that there is a similarity between this
+function and the formula given in equation~\ref{odds_prop}.   What this means
+is that the entire linear predictor (and the intercept on its own) are
+effectively the (natural) log odds of a respondent answering a question
+with `yes'.   The other parameters are the (natural) log-odds ratio for a
+'yes' response for a member of the group described by that predictor variable
+relative to the baseline.   For example, the log-odds ratio of a male respondent relative to a female replying `yes' to the question about trips.
+
+
+For reference purposes, the inverse function to the logistic
+link~\ref{logit_link} is as follows:
+
+\begin{displaymath}
+\theta_i = \frac{\exp(\eta_i)}{1 + \exp(\eta_i)}
+\end{displaymath}
+
+In other words, we can use this to calculate the probability that a particular
+respondent replied `yes' to the dichotomised trip question.
+
+
