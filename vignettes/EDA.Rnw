@@ -263,8 +263,6 @@ mene_disability_year <- xtable(with(mene.df, xtabs(~year + disability, exclude=N
 print(mene_disability_year, include.colnames=TRUE, format.args=list(big.mark=","))
 @
 
->>>>>>> 8fdd48e8f7c274b1bc5c4a7c8a114264dbb2a3ce
-.
 \clearpage
 
 \subsection{Family structure}
