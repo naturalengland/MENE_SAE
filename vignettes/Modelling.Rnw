@@ -36,6 +36,21 @@ mene.df$marstat <- droplevels(mene.df$marstat)
 mene.df$marstat <- relevel(mene.df$marstat, ref="Single")
 mene.df$child_in_hh <- relevel(mene.df$child_in_hh, ref="None")
 
+ 
+\subsection{Model fitting to two dichotomised outcomes}
+
+ 
+\N The response to MENE survey Question 1 records the number of trips taken in the past seven days.  Question 17 has been dichotomised as at least one trip a month.   A much smaller number of respondents reply to Q17 than do to Q1. For the purposes of this feasibility study, we have modelled both as a binary indicator, equal to $0$ if either no trips in the last seven days, or a trip frequency of less than once a month in the previous year year.   The outcome was denotes as $1$ if at least one trip had been made in the last seven days or the trip frequency was at least one trip a month in the previous year.   A response ``1'' therefore indicates the positive outcome and all parameter estimates can be interpreted in that regard.
+
+\N All the available predictors were examined, including two way interactions.   Parameter estimates from the finally selected model are given in table~\ref{coefs} and a  visual summary is subsequently given in figure~\ref{coefplot_q1_q17} (along with 95\% and 90\% confidence intervals for the parameter estimates).
+
+<<fitmodels, fig=FALSE, echo=FALSE, results=hide>>=
+mene.df$year <- factor(mene.df$year, levels = c("Y0910", "Y1011", "Y1112", "Y1213", "Y1314", "Y1415", "Y1516"))
+mene.df$marstat[mene.df$marstat == "NA"] <- NA
+mene.df$marstat <- droplevels(mene.df$marstat)
+mene.df$marstat <- relevel(mene.df$marstat, ref="Single")
+mene.df$child_in_hh <- relevel(mene.df$child_in_hh, ref="None")
+
 m1 <- glm(q1_binary ~ age + sex + age:sex + car + seg + marstat + ethnicity_5 + child_in_hh + adults_in_hh + year, 
           family = binomial, data = mene.df[mene.df$year != "Y1617" | mene.df$year != "Y1718",])
 m17 <- glm(q17_binary ~ age + sex + age:sex + car + seg + marstat + ethnicity_5 + child_in_hh + adults_in_hh + year, 
@@ -98,6 +113,30 @@ In total, \Sexpr{length(m17$linear.predictors)} data points were used to fit thi
 
 
 \N The effects of different predictors are readily seen in figure~\ref{coefplot_q1_q17}.   This shows the log odds ratio of having made a trip in the last seven days or one trip a month in the last year increased where there was access to a car relative to not having a car or when the respondent was male.   Trip taking progressively decreased as the social class went from group C1 to C2 to DE relative to the reference group AB.   Responses who indicated that they had children in a household were more likely to have reported a trip for either question, but three or more adults in a household were consisent with being less likely to report a trip.  Figure~\ref{coefplot_q1_q17} also gives a visual summary of the confidence intervals for each parameter estimate, and compares the models fitted to Q1 and Q17.   It can be seen for example that the interval estimates are wider when fitting a model to Q17, reflecting greater uncertainty in the parameter estimate as a result of the smaller sample size.   In an informal sense, this plot also captures a sense of ``statistical significance''. Interval estimates which do not overlap zero would conventionally be regarded as ``statistically significant''.  However, the further the estimate is away from zero, the stronger the relationship between that level of the explanatory variable and the response variable of interest (Q1 or Q17).   The width of the interval estimate also visualises the precision or otherwise by which the parameter has been estimated, with wide lines indicating that there is relatively less evidence in the survey sample to estimate the relationship with precision.
+
+\caption[Parameter estimates for Q1 and Q17 models][1in]{Parameter estimates from fitting model to Q1 (first four columns) and Q17 (last four columns)}
+\label{coefs}
+\end{figure*}
+
+\clearpage
+
+\N To illustrate what these estimates are saying, the following should be noted:
+
+\begin{itemize}
+\item For every categorical variable considered, the parameter estimates indicate ``log odds'' relative to the reference case.
+\begin{itemize}
+\item[log-odds] An appendix is available which explains the reason for using a model which gives the effects of different variables in units of ``log-odds''. A key point to note is that any parameter estimate \emph{below zero} indicates that those characteristics are associated with a decrease in the chances that such an individual reported a trip relative to the reference case. Conversely, with parameter estimates above zero they are more likely to have reported a trip.
+\item[reference case] The ``reference case'' is a level of the variable which can be seen in the previous section but not given in the table of model parameter estimates~\ref{coefs}.  All other estimates are to be understodd as the effect relative to this reference case. For example, as this table gives parameter estimates for ``Male'', the parameter estimates provided are comparing the difference between respondents who select ``Male'' with the reference response ``Female''.
+\end{itemize}
+\item The reference case then is thefore Female, 16-24 year old, in social group AB, without a car, single, asian, living with no other adults in the household and having no children in the household.   The log odds that such a person would have reported a trip in the last seven days are given as \Sexpr{round(coef(m1)[1], 3)} These values are taken from the first row in table~\ref{coefs}.
+\item The probability that this person (she) would be have reported a trip in the last week can be computed as  $\frac{\exp(\Sexpr{round(coef(m1)[1], 3)})}{1 + \exp(\Sexpr{round(coef(m1)[1], 3)})}$ or about $\Sexpr{round(invlogit(coef(m1)[1]), 3)}$. Full details on the origin of this equation are appended.
+\item Likewise, the odds that they reported taking at least one trip a month over the last year are estimated as \Sexpr{round(coef(m17)[1], 3)}, and hence the probability that would be have reported at least one trip a month in the last year was  $\frac{\exp(\Sexpr{round(coef(m17)[1], 3)})}{1 + \exp(\Sexpr{round(coef(m17)[1], 3)})}$ or about $\Sexpr{round(invlogit(coef(m17)[1]), 3)}$.
+\end{itemize}
+
+\N Hence, for example, when a parameter estimate is indicated for males of \Sexpr{round(coef(m1)[which(names(coef(m1)) == "sexMale")], 4)}, this indicates that the log-odds ratio for males indicating they had made a trip in the last seven days was \Sexpr{round(coef(m1)[which(names(coef(m1)) == "sexMale")], 4)} the value of that for females.  This means that their odd ratio was \Sexpr{round(exp(coef(m1)[which(names(coef(m1)) == "sexMale")]), 4)} times those of females, indicating that, for all other variables held constant, males were more likely to have reported a trip.
+
+
+\N The effects of different predictors are readily seen in figure~\ref{coefplot_q1_q17}.   This shows the log odds ratio of having made a trip in the last seven days or one trip a month in the last year increased where there was access to a car relative to not having a car or when the respondent was male.   Trip taking progressively decreased as the social class went from group C1 to C2 to DE relative to the reference group AB.   Responses who indicated that they had children in a household were more likely to have reported a trip for either question, but three or more adults in a household were consisent with being less likely to report a trip.  Figure~\ref{coefplot_q1_q17} also gives a visual summary of the confidence intervals for each parameter estimate, and compares the models fitted to Q1 and Q17.   It can be seen for example that the interval estimates are wider when fitting a model to Q17, reflecting greater uncertainty in the parameter estimate as a result of the smaller sample size.
 
 \begin{figure*}
 <<last_week, echo=FALSE, results=hide, fig=TRUE>>=
