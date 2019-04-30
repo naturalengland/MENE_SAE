@@ -8,8 +8,6 @@ mene.df <- mene_code_q1(mene.df)
 mene.df <- mene_code_q17(mene.df)
 source("../R_script/get_sam.R")
 sam.df$car_own <- as.factor(sam.df$cars)
-mene.df <- mene_code_q1(mene.df)
-mene.df <- mene_code_q17(mene.df)
 f <- function(x){return(gsub("\\.", " ", x))}
 
 @
@@ -256,6 +254,16 @@ mene_disability_year <- xtable(with(mene.df, xtabs(~year + disability, exclude=N
 print(mene_disability_year, include.colnames=TRUE, format.args=list(big.mark=","))
 @
 
+
+\N However, a bigger problem with the use of this variable is that the question has not been asked in all years.   Table~\ref{mene_disability_year} shows that the question was only asked until 2015/16.
+
+
+<<mene_disability_year, fig=FALSE, results=tex, echo=FALSE>>=
+mene_disability_year <- xtable(with(mene.df, xtabs(~year + disability, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by disability status by year", label="mene_disability_year", auto=TRUE)
+print(mene_disability_year, include.colnames=TRUE, format.args=list(big.mark=","))
+@
+
+>>>>>>> 8fdd48e8f7c274b1bc5c4a7c8a114264dbb2a3ce
 .
 \clearpage
 
@@ -336,6 +344,26 @@ Number in household & All years (map to MENE)
 
 \N In Bayesian models, it is relatively straightforward to include a data imputation stage to handle missing data. This can easily deal with small numbers of randomly missing responses from individual responses. It cannot however be assumed that it magically corrects two years of systematic non-response.  As this study is intended as a quick feasibility study, the data will be subsetted to include data from survey year 2009/2010 through to 2015/2016 for variable screening and local small area prediction. For overall sample size work, it will use just data from 2015/2016.   
 
+
+\N A dominant feature of this exploration is that there are a number of systematically missing responses.  Table~\ref{varscreen} lists the variables that will be considered for this feasibility study. The inclusion of Car Ownerhip means that, for modelling purposes, we will only consider data up until the survey year 2015/2016.   
+
+
+\begin{table}[!ht]
+\begin{tabular}{ll}
+Age & All years \\
+Sex & All years \\
+Car Ownership & Until 2015/16\\
+Socio-economic grouping & All years \\
+Ethnicity & All years (Map to 5 groups) \\
+Marital status & All years (map to MENE) \\
+Children in household & All years (create binary indicator)\\
+Number in household & All years (map to MENE)
+\end{tabular}
+\label{varscreen}
+\caption{Summary of variables considered for modelling purposes}
+\end{table}
+
+\N In Bayesian models, it is relatively straightforward to include a data imputation stage to handle missing data. This can easily deal with small numbers of randomly missing responses from individual responses. It cannot however be assumed that it magically corrects two years of systematic non-response.  As this study is intended as a quick feasibility study, the data will be subsetted to include data from survey year 2009/2010 through to 2015/2016 for variable screening and local small area prediction. For overall sample size work, it will use just data from 2015/2016.
 
 \subsection{Response variables}
 
