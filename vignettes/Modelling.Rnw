@@ -5,70 +5,136 @@ source("../R/sanitize_mene.R")
 mene.df <- mene_factors(mene.df)
 mene.df <- mene_code_q1(mene.df)
 mene.df <- mene_code_q17(mene.df)
-
+mene.df <- mene.df[mene.df$year != "Y1617" & mene.df$year != "Y1718",]
 require(arm)
+require(xtable)
+require(effects)
+invlogit <- function(x){return(1 / (1 + exp(-1 * x)))}
 @
  
 \section{Exploratory Modelling}
 
-\N For the purposes of the feasibility study, given the complexity of dealing with nine years of survey data\footnote{There are issues with missing data and so on which are associated with the year/wave of the survey}, an automatic variable selection method based on AIC was applied from the MASS package\footnote{Venables, W. N. \& Ripley, B. D. (2002) Modern Applied Statistics with S. Fourth Edition. Springer, New York. ISBN 0-387-95457-0}, namely using the \texttt{stepAIC()} function.   The aim is to select a model which can provide an adequate representation of the survey data and which is sufficient for small area estimation.
- 
-\subsection{Model fitting to Q1 (trips made in the previous week)}
+\N Exploratory modelling has been carried out using the R software\footnote{ R Core Team (2019). R: A language and environment for statistical
+  computing. R Foundation for Statistical Computing, Vienna, Austria.
+  URL https://www.R-project.org/.} version 3.5.3 ``Great Truth''.
   
-\N The response to MENE survey Question 1 records the number of trips taken in the past seven days.   Having explored this variable carefully, it would appear to have the properties of a Zero Inflated Poisson variable\footnote{Hall, Daniel B. ``Zero???inflated Poisson and binomial regression with random effects: a case study.'' Biometrics 56.4 (2000): 1030-1039.}. However, for the purposes of this feasibility study, we have modelled it as a binary indicator, equal to $0$ if no trips had been made in the previous seven days and $1$ if at least one trip had been made in the last seven days.
+\N For the purposes of the feasibility study, given the complexity of dealing with seven years of survey data\footnote{As noted in the previous section, the most recent two years of data were disgregarded as key questions on car ownership had not been asked} a quick variable selection method based on AIC was applied.   Specifically, the \texttt{stepAIC()} function from the MASS package\footnote{Venables, W. N. \& Ripley, B. D. (2002) Modern Applied Statistics with S. Fourth Edition. Springer, New York. ISBN 0-387-95457-0}.   This choice was made on pragmatic grounds; in order to identify candidate models within the scope the feasibility study.   The aim is to select a model which can provide an adequate representation of the survey data and which is sufficient to give a realistic prospect for a small area estimation process to be accurate.  Using the AIC provides a reasonable method for variable selection which can find a candidate model without overfitting to the specific dataset examined.
 
-\N All the available predictors were examined, including two way interactions.   Parameter estimates from the finally selected model are given in table~\ref{m1_coefs} and a visual summary is given in figure~\ref{coefplot_q1} (along with 95\% and 90\% confidence intervals for the parameter estimates).
+\N The AIC (\emph{A}n \emph{I}nformation \emph{C}riterion\footnote{Akaike, H. (1973), ``Information theory and an extension of the maximum likelihood principle'', in Petrov, B. N.; Csaki, F. (eds.), 2nd International Symposium on Information Theory, Tsahkadsor, Armenia, USSR, September 2-8, 1971, Budapest: Akademiai Kiado, pp. 267-281. Republished in Kotz, S.; Johnson, N. L., eds. (1992), Breakthroughs in Statistics, I, Springer-Verlag, pp. 610-624.} is an overall metric which assesses comparative model fit, models with a lower AIC are better fitting than those with a higher AIC. It contains a fit term and a penalty term. It is always possible to improve model fit by adding more variables, the penalty term acts as a deterrent against including too many variables. As implemented here, the automated model search starts with a full model (all possible terms) and check sequentially whether removal of any one variable would notably improve the AIC, and if so which variable is the best to remove.   The final model is one which has as few variables as pssible, but retains comparable predictive power to the full model.;
 
-\begin{figure}
-<<last_week, echo=FALSE, results=hide, fig=TRUE>>=  
-m1 <- glm(q1_binary ~ age + tenure + seg + car + as.factor(year), 
+\subsection{Model fitting to two dichotomised outcomes}
+
+ 
+\N The response to MENE survey Question 1 records the number of trips taken in the past seven days.  Question 17 has been dichotomised as at least one trip a month.   A much smaller number of respondents reply to Q17 than do to Q1. For the purposes of this feasibility study, we have modelled both as a binary indicator, equal to $0$ if either no trips in the last seven days, or a trip frequency of less than once a month in the previous year year.   The outcome was denotes as $1$ if at least one trip had been made in the last seven days or the trip frequency was at least one trip a month in the previous year.   A response ``1'' therefore indicates the positive outcome and all parameter estimates can be interpreted in that regard.
+
+\N All the available predictors were examined, including two way interactions.   Parameter estimates from the finally selected model are given in table~\ref{coefs} and a  visual summary is subsequently given in figure~\ref{coefplot_q1_q17} (along with 95\% and 90\% confidence intervals for the parameter estimates).
+
+<<fitmodels, fig=FALSE, echo=FALSE, results=hide>>=
+mene.df$year <- factor(mene.df$year, levels = c("Y0910", "Y1011", "Y1112", "Y1213", "Y1314", "Y1415", "Y1516"))
+mene.df$marstat[mene.df$marstat == "NA"] <- NA
+mene.df$marstat <- droplevels(mene.df$marstat)
+mene.df$marstat <- relevel(mene.df$marstat, ref="Single")
+mene.df$child_in_hh <- relevel(mene.df$child_in_hh, ref="None")
+
+m1 <- glm(q1_binary ~ age + sex + age:sex + car + seg + marstat + ethnicity_5 + child_in_hh + adults_in_hh + year, 
           family = binomial, data = mene.df[mene.df$year != "Y1617" | mene.df$year != "Y1718",])
-coefplot(m1, mar=c(1, 7, 4, 1), main="")
+m17 <- glm(q17_binary ~ age + sex + age:sex + car + seg + marstat + ethnicity_5 + child_in_hh + adults_in_hh + year, 
+          family = binomial, data = mene.df[mene.df$year != "Y1617" | mene.df$year != "Y1718",])
 @
-\label{coefplot_q1}
-\caption{Parameter estimates from model fitted to Dichotomised Q1 (trips taken in the last seven days)}
-\end{figure}
 
+\begin{figure*}
+\begin{minipage}{0.6\textwidth}
+\begin{flushright}
+Parameter estimates for predicting Q1
+\end{flushright}
+
+\footnotesize
 <<last_week_tab, echo=FALSE, results=tex, fig=FALSE, width=5, height=6>>=
-x.m1 <- xtable(summary(m1), caption="Trips in last week, parameter estimates", label="m1_coefs", auto=TRUE)
+x.m1 <- xtable(summary(m1), auto=TRUE)
 digits(x.m1) <- 3
-print(x.m1, include.colnames=TRUE, format.args=list(big.mark=","))
+print(x.m1, include.colnames=TRUE, format.args=list(big.mark=","), floating=FALSE)
 @
 
-\N To illustrate what these estimates are saying, the probability of having made a trip in the last seven days, for a reference case of a person 16-24 year old, with a Mortgage, self reporting very bad health, in social group AB and without a car would be $\frac{\exp(-0.903127)}{1 + \exp(-0.90312)}$ or about $0.29$.   For the same reference case but for a respondent with a car this increases to $\frac{\exp(-0.903127 + 0.437113)}{1 + exp(-0.903127 + 0.437113)} = 0.39$
+In total, \Sexpr{length(m1$linear.predictors)} data points were used to fit this model.
 
-\N The effects of different predictors are readily seen in figure~\ref{coefplot_q1}.   This shows the log odds ratio of having made a trip in the last seven days increased where there was access to a car relative to not having a car, progressively decreased as the social class went from group C1 to C2 to DE relative to group AB.   Likewise, relative to those in the reference case of Very Bad health, the odds of taking a trip in the last five years increased with improving health.   Those in rented accomodation were less likely to make a trip, and those aged over 65 were less likely to make a trip than the reference case of 16-24.
+\end{minipage}
+\begin{minipage}{0.4\textwidth}
+
+\begin{flushright}
+Parameter estimates for predicting Q17
+\end{flushright}
+
+\footnotesize
+<<last_year_tab, echo=FALSE, results=tex, fig=FALSE, width=5, height=6>>=
+x.m17 <- xtable(summary(m17), auto=TRUE)
+digits(x.m17) <- 3
+print(x.m17, include.colnames=TRUE, include.rownames=FALSE, format.args=list(big.mark=","), floating=FALSE)
+@
+
+In total, \Sexpr{length(m17$linear.predictors)} data points were used to fit this model.
+
+\end{minipage}
+
+\caption[Parameter estimates for Q1 and Q17 models][1in]{Parameter estimates from fitting model to Q1 (first four columns) and Q17 (last four columns)}
+\label{coefs}
+\end{figure*}
 
 \clearpage
-\subsection{Model fitting to Q17}
-  
-\N The response to question 17 was an estimate of the frequency of trips made in the previous year.   A summary of responses is given in table~\ref{mene_q17}.
 
-<<mene_q17, fig=FALSE, results=tex, echo=FALSE>>=
-mene_q17 <- xtable(with(mene.df, xtabs(~q17, exclude=NULL, na.action=na.pass)), caption="MENE Responses to Q17", label="mene_q17", auto=TRUE)
-print(mene_q17, include.colnames=FALSE, format.args=list(big.mark=","))
+\N To illustrate what these estimates are saying, the following should be noted:
+
+\begin{itemize}
+\item For every categorical variable considered, the parameter estimates indicate ``log odds'' relative to the reference case.
+\begin{itemize}
+\item[log-odds] An appendix is available which explains the reason for using a model which gives the effects of different variables in units of ``log-odds''. A key point to note is that any parameter estimate \emph{below zero} indicates that those characteristics are associated with a decrease in the chances that such an individual reported a trip relative to the reference case. Conversely, with parameter estimates above zero they are more likely to have reported a trip.
+\item[reference case] The ``reference case'' is a level of the variable which can be seen in the previous section but not given in the table of model parameter estimates~\ref{coefs}.  All other estimates are to be understodd as the effect relative to this reference case. For example, as this table gives parameter estimates for ``Male'', the parameter estimates provided are comparing the difference between respondents who select ``Male'' with the reference response ``Female''.
+\end{itemize}
+\item The reference case then is thefore Female, 16-24 year old, in social group AB, without a car, single, asian, living with no other adults in the household and having no children in the household.   The log odds that such a person would have reported a trip in the last seven days are given as \Sexpr{round(coef(m1)[1], 3)} These values are taken from the first row in table~\ref{coefs}.
+\item The probability that this person (she) would be have reported a trip in the last week can be computed as  $\frac{\exp(\Sexpr{round(coef(m1)[1], 3)})}{1 + \exp(\Sexpr{round(coef(m1)[1], 3)})}$ or about $\Sexpr{round(invlogit(coef(m1)[1]), 3)}$. Full details on the origin of this equation are appended.
+\item Likewise, the odds that they reported taking at least one trip a month over the last year are estimated as \Sexpr{round(coef(m17)[1], 3)}, and hence the probability that would be have reported at least one trip a month in the last year was  $\frac{\exp(\Sexpr{round(coef(m17)[1], 3)})}{1 + \exp(\Sexpr{round(coef(m17)[1], 3)})}$ or about $\Sexpr{round(invlogit(coef(m17)[1]), 3)}$.
+\end{itemize}
+
+\N Hence, for example, when a parameter estimate is indicated for males of \Sexpr{round(coef(m1)[which(names(coef(m1)) == "sexMale")], 4)}, this indicates that the log-odds ratio for males indicating they had made a trip in the last seven days was \Sexpr{round(coef(m1)[which(names(coef(m1)) == "sexMale")], 4)} the value of that for females.  This means that their odd ratio was \Sexpr{round(exp(coef(m1)[which(names(coef(m1)) == "sexMale")]), 4)} times those of females, indicating that, for all other variables held constant, males were more likely to have reported a trip.
+
+
+\N The effects of different predictors are readily seen in figure~\ref{coefplot_q1_q17}.   This shows the log odds ratio of having made a trip in the last seven days or one trip a month in the last year increased where there was access to a car relative to not having a car or when the respondent was male.   Trip taking progressively decreased as the social class went from group C1 to C2 to DE relative to the reference group AB.   Responses who indicated that they had children in a household were more likely to have reported a trip for either question, but three or more adults in a household were consisent with being less likely to report a trip.  Figure~\ref{coefplot_q1_q17} also gives a visual summary of the confidence intervals for each parameter estimate, and compares the models fitted to Q1 and Q17.   It can be seen for example that the interval estimates are wider when fitting a model to Q17, reflecting greater uncertainty in the parameter estimate as a result of the smaller sample size.   In an informal sense, this plot also captures a sense of ``statistical significance''. Interval estimates which do not overlap zero would conventionally be regarded as ``statistically significant''.  However, the further the estimate is away from zero, the stronger the relationship between that level of the explanatory variable and the response variable of interest (Q1 or Q17).   The width of the interval estimate also visualises the precision or otherwise by which the parameter has been estimated, with wide lines indicating that there is relatively less evidence in the survey sample to estimate the relationship with precision.
+
+\begin{figure*}
+<<last_week, echo=FALSE, results=hide, fig=TRUE>>=
+
+coefplot(m1, mar=c(1, 7, 4, 1), main="")
+coefplot(m17, mar=c(1, 7, 4, 1), main="", add=TRUE, col="red", offset=-0.3)
+legend("topright", lwd=1, col = c("black", "red"), legend = c("Q1", "Q17"), bty = "n")
 @
+\label{coefplot_q1}
+\caption[Parameter estimates][-1in]{Parameter estimates (log odds ratios) from model fitted to Dichotomised Q1 (trips taken in the last seven days) and Dichotomised Q17 (at least one trip a month in the last year)}
+\end{figure*}
 
-\N As with Question 1 (trips made in the previous week) more complex modelling is certainly possible. Ideally, something like a proportional odds logistic regression model could be used to respect the order of the responses\footnote{Brant, Rollin. "Assessing proportionality in the proportional odds model for ordinal logistic regression." Biometrics (1990): 1171-1178.}. This does however complicate the modelling process, removes the availability of quick variable selection methods and introduces a large number of additional assumptions which have to be checked.  Therefore, for the purposes of a feasibility study we have again dichotomised the output, assigning $0$ to responses which indicated that they ``Never'' made trips of that they only made trips ``"Once or twice''.   All answers indicating a higher frequency of trips were assigned $1$. 
+\N There does appear to be an uneven trend over time, with the odds for having reported a trip increasing over the seven years of the survey. However, this is largely regarded as a nuisance paramter. In this analysis, the trend over time is not of interest in its own right. Time is included to allow strength to be borrowed from the data over all years without misrepresenting current respondent replies.
 
-\N A visual summary of the parameter estimates from the final model is given in figure~\ref{coefplot_q17} (along with 95\% and 90\% confidence intervals for the parameter estimates).   A more conventional tabulation of the parameter estimates is given in table~\ref{m17_coefs}
 
-\begin{figure}
-<<last_year, echo=FALSE, results=hide, fig=TRUE, width=5, height=6>>=  
-m17 <- glm(q17_binary ~ age + tenure + genhealth + seg + car, family = binomial, data = mene.df)
-coefplot(m17, mar=c(1, 7, 4, 1), main = "")
+\N The parameter estimates for age and sex a slightly more complex as they ``interact''.  In other words, the ``effect'' of being male is slightly different at different ages.   This is perhaps best illustrated visually in figure~\ref{effects_q1_q17}.   The interaction effects are modest, and mainly appear to relate to either end of the age range.   Young males are far more likely to have reported a trip in the last week than would have been the case without an interaction, and old females are less likely to have reported a trip without an interaction effect..
+
+
+\begin{figure*}
+
+\begin{minipage}{0.5\textwidth}
+<<age_sex_q1, fig = TRUE, echo = FALSE, results = hide, height=4, width=3.5>>=
+age_sex1 <- effect("age*sex", m1)
+plot(age_sex1, ylab="log odds for Q1", main = "Q1-Age:Sex effects", rotx=45)
 @
-\label{coefplot_q17}
-\caption{Parameter estimates from model fitted to Dichotomised Q17 (reported trips in the last year was higher than once or twice)}
-\end{figure}
-
-\N The probability of having made a trip more than once or twice in the last year, for a reference case of 16-24 year old, with a Mortgage of very bad health in social group AB without a car $\frac{\exp(0.9669)}{1 + \exp(0.9669)}$ or about $0.72$.   For the same reference case but with a car this increases to $\frac{\exp(-0.903127 + 0.5939)}{1 + exp(-0.903127 + 0.5939)} = 0.82$
-
-<<last_year_tab, echo=FALSE, results=tex, fig=FALSE>>=
-x.m17 <- xtable(summary(m17), caption="Trips in last year, parameter estimates", label="m17_coefs", auto=TRUE)
-digits(x.m17) <- 3
-print(x.m17, include.colnames=TRUE, format.args=list(big.mark=","))
+\end{minipage}
+\begin{minipage}{0.5\textwidth}
+<<age_sex_q17, fig = TRUE, echo = FALSE, results = hide, height=4, width=3.5>>=
+age_sex17 <- effect("age*sex", m17)
+plot(age_sex17, ylab="log odds for Q17", main = "Q17-Age:Sex effects", rotx=45)
 @
+\end{minipage}
 
-\N Figure~\ref{coefplot_q17} shows that the odds of having made a trip in the last seven days increased where there was access to a car relative to not having a car, were progressively lower as the social class went from groupC12 to DE relative to group AB.   Likewise, relative to those in the reference case of Very Bad health, the odds of taking a trip in the last five years increased with improving health.   Those in rented accomodation were less likely to make a trip, and those aged over 65 were less likely to make a trip.
+\caption{Effects plot for age:sex interaction for Q1 and Q17}
+\label{effects_q1_q17}
+\end{figure*}
 
+\clearpage
+
+\N This brief summary therefore represents the model that will be taken forward and used for small area estimation in the next section.   Clearly it would be possible to include Bayesian imputation methods for the missing responses to cars availability and use more recent data as well, however this will introduce uncertainty which could impact the precision of the small area estimates.   
