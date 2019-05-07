@@ -22,6 +22,7 @@ invlogit <- function(x){return(1 / (1 + exp(-1 * x)))}
 
 \N The AIC (\emph{A}n \emph{I}nformation \emph{C}riterion\footnote{Akaike, H. (1973), ``Information theory and an extension of the maximum likelihood principle'', in Petrov, B. N.; Csaki, F. (eds.), 2nd International Symposium on Information Theory, Tsahkadsor, Armenia, USSR, September 2-8, 1971, Budapest: Akademiai Kiado, pp. 267-281. Republished in Kotz, S.; Johnson, N. L., eds. (1992), Breakthroughs in Statistics, I, Springer-Verlag, pp. 610-624.} is an overall metric which assesses comparative model fit, models with a lower AIC are better fitting than those with a higher AIC. It contains a fit term and a penalty term. It is always possible to improve model fit by adding more variables, the penalty term acts as a deterrent against including too many variables. As implemented here, the automated model search starts with a full model (all possible terms) and check sequentially whether removal of any one variable would notably improve the AIC, and if so which variable is the best to remove.   The final model is one which has as few variables as pssible, but retains comparable predictive power to the full model.;
 
+
 \subsection{Model fitting to two dichotomised outcomes}
 
  
@@ -29,6 +30,22 @@ invlogit <- function(x){return(1 / (1 + exp(-1 * x)))}
 
 \N All the available predictors were examined, including two way interactions.   Parameter estimates from the finally selected model are given in table~\ref{coefs} and a  visual summary is subsequently given in figure~\ref{coefplot_q1_q17} (along with 95\% and 90\% confidence intervals for the parameter estimates).
 
+<<fitmodels, fig=FALSE, echo=FALSE, results=hide>>=
+mene.df$year <- factor(mene.df$year, levels = c("Y0910", "Y1011", "Y1112", "Y1213", "Y1314", "Y1415", "Y1516"))
+mene.df$marstat[mene.df$marstat == "NA"] <- NA
+mene.df$marstat <- droplevels(mene.df$marstat)
+mene.df$marstat <- relevel(mene.df$marstat, ref="Single")
+mene.df$child_in_hh <- relevel(mene.df$child_in_hh, ref="None")
+
+ 
+\subsection{Model fitting to two dichotomised outcomes}
+
+ 
+\N The response to MENE survey Question 1 records the number of trips taken in the past seven days.  Question 17 has been dichotomised as at least one trip a month.   A much smaller number of respondents reply to Q17 than do to Q1. For the purposes of this feasibility study, we have modelled both as a binary indicator, equal to $0$ if either no trips in the last seven days, or a trip frequency of less than once a month in the previous year year.   The outcome was denotes as $1$ if at least one trip had been made in the last seven days or the trip frequency was at least one trip a month in the previous year.   A response ``1'' therefore indicates the positive outcome and all parameter estimates can be interpreted in that regard.
+
+\N All the available predictors were examined, including two way interactions.   Parameter estimates from the finally selected model are given in table~\ref{coefs} and a  visual summary is subsequently given in figure~\ref{coefplot_q1_q17} (along with 95\% and 90\% confidence intervals for the parameter estimates).
+
+>>>>>>> 6b4a096aecac16894f18ff1aef5573b2a48cf99c
 <<fitmodels, fig=FALSE, echo=FALSE, results=hide>>=
 mene.df$year <- factor(mene.df$year, levels = c("Y0910", "Y1011", "Y1112", "Y1213", "Y1314", "Y1415", "Y1516"))
 mene.df$marstat[mene.df$marstat == "NA"] <- NA
@@ -69,9 +86,10 @@ Parameter estimates for predicting Q17
 x.m17 <- xtable(summary(m17), auto=TRUE)
 digits(x.m17) <- 3
 print(x.m17, include.colnames=TRUE, include.rownames=FALSE, format.args=list(big.mark=","), floating=FALSE)
+n <- length(m17$linear_predictors
 @
 
-In total, \Sexpr{length(m17$linear.predictors)} data points were used to fit this model.
+In total, \Sexpr{n} data points were used to fit this model.
 
 \end{minipage}
 
