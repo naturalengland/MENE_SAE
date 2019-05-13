@@ -1,424 +1,613 @@
 \SweaveOpts{prefix.string=figs/sae}
 
-<<prep, echo=FALSE, results=hide>>=
-library(rpostgis)
-library(xtable)
+<<load_data.R, echo=FALSE, results=hide>>=
 library(arm)
+library("rstan")
 library(hash)
-drv <- dbDriver("PostgreSQL")
-con <- dbConnect(drv, dbname = "gis")
-
-mene.df <- dbGetQuery(con, "select q1, q17, tenure, age, sex, ethnicity, disability,
-                            marital, workstat, seg, segall, lifestage, physical,
-                            adults_in_hh, child_in_hh, hh_size, workstat,
-                            car, generalhealth, year, residence_localauthority
-                       from staging.natural_england_mene_respondents_y1_9;")
-mene.df$age = as.factor(mene.df$age)
-mene.df$q1_binary <- 0
-mene.df$q1_binary[mene.df$q1 > 0] <- 1
-mene.df$q17_binary <- 1
-mene.df$q17_binary[mene.df$q17 == "Never"] <- 0
-mene.df$q17_binary[mene.df$q17 == "Once or twice"] <- 0
-mene.df$q17_binary[mene.df$q17 == " "] <- NA
-mene.df$q17 <- factor(mene.df$q17, levels=c("Never", "Once or twice", "Once every 2-3 months", "Once or twice a month", "Once a week", "Several times a week", "Every day", "More than once per day"))
-mene.df$sex = as.factor(mene.df$sex)
-mene.df$seg = as.factor(mene.df$seg)
-mene.df$segall = as.factor(mene.df$segall)
-mene.df$tenure = as.factor(mene.df$tenure)
-mene.df$ethnicity = as.factor(mene.df$ethnicity)
-mene.df$disability = as.factor(mene.df$disability)
-mene.df$marstat = as.factor(mene.df$marital)
-mene.df$adults_in_hh <- as.factor(mene.df$adults_in_hh)
-mene.df$child_in_hh <- as.factor(mene.df$child_in_hh)
-mene.df$hh_size <- as.factor(mene.df$hh_size)
-mene.df$workstat <- as.factor(mene.df$workstat)
-mene.df$car <- as.factor(mene.df$car)
-mene.df$genhealth <- factor(mene.df$generalhealth, levels = c("Don't know", "Very bad", "Bad", "Fair", "Good", "Very good"))
-mene.df$car[!(mene.df$car == "Yes" | mene.df$car == "No")] <- NA
-mene.df$genhealth[mene.df$genhealth == "Don't know"] <- NA
-mene.df$la <- mene.df$residence_localauthority
-duffer <- c(" ", "355", "356", "358", "359", "361", "362", "367", "368", "371", "372",
-"373", "374", "375")  
-for (duff in duffer) {mene.df$la[mene.df$la == duff] <- NA}
-mene.df$la <- as.factor(mene.df$la)
-mene.df$la_number <- as.numeric(mene.df$la)
-@
-
-<<model_fit, results=hide, echo=FALSE>>=
-y = mene.df$q1_binary
-current.na.action <- options('na.action')
-options(na.action='na.pass')
-X = model.matrix(~age + sex + car + seg + genhealth, mene.df)
-dim(X)
-X <- cbind(X, mene.df$la_number)
-dim(X)
-head(X)
-xy = cbind(y, X)
-dim(xy)
-xy <- na.omit(xy)
-dim(xy)
-y = xy[,1]
-X = xy[,-1]
-la_index <- xy[,ncol(xy)]
-X <- X[,-ncol(X)]
-head(X)
-options(na.action=current.na.action)
-stan_data = list(y=as.integer(y), X=X, N=length(y), K=dim(X)[2], la_index=la_index, N_las=max(la_index))
-library("rstan")
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
+source("../R_script/get_mene.R")
+source("../R/sanitize_mene.R")
+source("../R/mene_to_stan.R")
+mene.df <- mene_factors(mene.df)
+mene.df <- mene_code_q1(mene.df)
+mene.df <- mene_code_q17(mene.df)
+mene.df <- mene.df[mene.df$year != "Y1617" & mene.df$year != "Y1718",]
+mene.df$car <- droplevels(mene.df$car)
+mene.df <- create_la_index(mene.df)
+@
 
-# fit <- stan(file = '../stan/simple_hierarchical_bernoulli_glm.stan', data = stan_data, chains=2)
+<<q1_model_fit.R, results=hide, echo=FALSE, fig=FALSE>>=
+mene.df$year <- factor(mene.df$year, levels = c("Y0910", "Y1011", "Y1112", "Y1213", "Y1314", "Y1415", "Y1516"))
+mene.df$marstat[mene.df$marstat == "NA"] <- NA
+mene.df$marstat <- droplevels(mene.df$marstat)
+mene.df$marstat <- relevel(mene.df$marstat, ref="Single")
+mene.df$child_in_hh <- relevel(mene.df$child_in_hh, ref="None")
+mene.df$car <- droplevels(mene.df$car)
+la_dict <- hash(c(1:length(levels(mene.df$la))), levels(mene.df$la))
 
-# m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm.stan')
+frequentist_m1 <- glm(q1_binary ~ age + sex + age:sex + car + seg + marstat + ethnicity_5 + child_in_hh + adults_in_hh + year, data = mene.df, family = binomial)
+
+stan_data <- format_hierarchical(mene.df$q1_binary, mene.df,
+"~ age + sex + age:sex + car + seg + marstat + ethnicity_5 + child_in_hh + adults_in_hh + year")
+post_reff_names <- label_las(la_dict, max(stan_data$la_index))
+
 m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm.stan')
 f <- optimizing(m, data = stan_data, hessian = TRUE)
-post_mean = f$par[1:17]
-post_mean_la = f$par[18:369]
-post_var = sqrt(1 / (-1 * diag(f$hessian)[1:17]))
-post_var_la = sqrt(1 / (-1 * diag(f$hessian)[18:369]))
-names(post_mean) <- colnames(X)
-names(post_var) <- names(post_mean)
-cbind(post_mean, post_var)
-
-
-dict <- hash(c(1:length(levels(mene.df$la))), levels(mene.df$la))
-the_names <- vector(,length(unique(la_index)))
-for (i in la_index) {the_names[i] = values(dict, i)}
-names(post_mean_la) <- the_names
-cbind(post_mean_la, post_var_la)
-
-
-
+stan_post=extract_bayesian_point_estimates(stan_data, f, post_reff_names)
 
 @
 
+\subsection{Q1 (trips in the last week): fitting a model to the entire data set}
 
-\subsection{Fitting a model to the entire dataset}
-
-\N The first set of plots summarise the results of fitting a plot to the entire dataset.   The rationale is that these are the most precise estimates which can be obtained and therefore act as a benchmark.   The obvious disadvantages are that it may be too simplistic to use a simple random effect for year as a way of accomodating changes over time and secondly, that not all variables seem to be available in all years.  Figure~\ref{ref_all} depicts a so-called ``caterpillar plot'', a summary of the 95\% posterior credible interval of the local authority random effects.   There are some data anomolies (the reason we see infinitely wide intervals) but this picture is intended as a way of evaluating the typical width of a credible interval.
+\N The first set of plots summarise the results of fitting a plot to the entire data set from survey year 2009/2010 through to 2015/2016. In other words, this uses data from all survey years where a question was asked about car availability.   Figure~\ref{q1_compare_bayes_freq} is a visual summary of the parameter estimates (in terms of log-odds) that have been obtained from the conventional model reported in the previous section and a fully Bayesian model used for small area estimation. It appears that there is good but not perfect agreement in terms of the parameter estimates.  It should be noted however that perfect agreement would not be expected as these are not \emph{exactly} the same model.  The Bayesian model contains a random effect for each local authority.
 
 
-\begin{figure}
-<<cat_plot_full, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
-n = length(post_mean_la)
-orderit <- order(post_mean_la)
-plot(post_mean_la[orderit], c(1:n), pch=16, xlim = c(-15, 15), xlab="Log odds", ylab="", yaxt="n")
-arrows(post_mean_la[orderit], c(1:n), post_mean_la[orderit] + 1.96 * post_var_la[orderit], c(1:n), angle=0.0001, col="grey")
-arrows(post_mean_la[orderit], c(1:n), post_mean_la[orderit] - 1.96 * post_var_la[orderit], c(1:n), angle=0.0001, col="grey")
-points(post_mean_la[orderit], c(1:n), col="red")
+\N Figure~\ref{q1_cat_all_years} depicts a so-called ``caterpillar plot'' of the random effects for each of the local authorities obtained from the Bayesian model. This is a visual summary of the 95\% posterior credible interval of the random effect in units of ``log odds''.   The names of the individual local authorities are not given in this plot for cosmetic reasons (they would be too small to read), however figure~\ref{q1_cat_zoom} will ``zoom'' in on a subset.   The reason for providing this plot is to give some idea of the authority by authority random effects, and to indicate how much variation in trip taking could be explained by well chosen authority specific predictor variables. There are some data anomalies. In some cases, the local authority has not been identified, and the plot shows extremely wide intervals estimates. However, this picture is intended as a way of evaluating the typical width of a credible interval for any unmodelled local authority specific effect on the number of trips reported in the previous week.
+
+
+
+\begin{figure*}
+<<q1_compare_freq_bayes, echo=FALSE, results=hide, fig=TRUE>>=
+coefplot(frequentist_m1, main = "log Odds Ratio", mar=c(1, 7, 6, 1))
+coefplot(stan_post$feff$mean[-1], stan_post$feff$var[-1], col="red", offset=0.2,
+         add=TRUE)
+legend("topright", col=c("black", "red"), lwd=c(1,1),
+       legend=c("Conventional", "Multilevel Bayesian"), bty="n")
+
 @
-\label{ref_all}
-\caption{Local Authority Random effects illustrated}
-\end{figure}
+\caption{Question 1 (trips in last week): comparison of parameter (``fixed'') estimates from frequentist (conventional) and multilevel Bayesian model fitted to Question 1}
+\label{q1_compare_bayes_freq}
+\end{figure*}
 
-\N Figure~\ref{ref_some} is an exploded view of the central part of figure~\ref{ref_all} created for illustrative purposes.  It shows a summary of the posterior 95\% credible interval for an arbitrary ten local authorities.  The precision of the final small area estimates is a function of the width of these intervals.
 
-\begin{figure}
-<<catplot_full_expanded, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
-plot(post_mean_la[orderit][101:110], c(1:10), pch=16, xlim = c(-2, +2), xlab="Log odds", ylab="", yaxt="n", bty="n")
-arrows(post_mean_la[orderit][101:110], c(1:10), post_mean_la[orderit][101:110] + 1.96 * post_var_la[orderit][101:110], c(1:10), angle=0.0001, col="grey")
-arrows(post_mean_la[orderit][101:110], c(1:10), post_mean_la[orderit][101:110] - 1.96 * post_var_la[orderit][101:110], c(1:10), angle=0.0001, col="grey")
-points(post_mean_la[orderit][101:110], c(1:10), col="red")
-text(-1.5, c(1:10), the_names[orderit][101:110], cex=0.75, pos=2, xpd=TRUE)
+
+\begin{figure*}
+<<q1_catplot_full, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+ordering <- order(stan_post$reff$mean)
+coefplot(stan_post$reff$mean[ordering], stan_post$reff$var[ordering], col="red", varnames="",
+         main = "log Odds Ratio", mar=c(1, 1, 5, 1)) 
 @
-\label{ref_some}
-\caption{Exploded view of posterior random effects for some authorities}
-\end{figure}
+\label{q1_cat_all_years}
+\caption{Question 1 (trips in last week): summary of interval estimates for local Authority Random effects from Bayesian model}
+\end{figure*}
+
+\N As a means of making the results more interpretable, figure~\ref{q1_cat_zoom} summarises the posterior credible interval for an \emph{arbitrarily chosen} selection of local authorities. The precision of the final small area estimates is a function of the width of these intervals. As noted in the previous section, it would be possible to model these in turn, using predictor variables that have social or geographic relevance and even to allow for spatial autocorrelation (to allow neighbouring areas to be similar in ways that are not explained by explicit numerical variables).
 
 
+\begin{figure*}
+<<q1_catplot_full_zoom.R, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+target_las = c("East Cambridgeshire", "Hartlepool", "Maidstone", "Bury", "Barrow-in-Furness",
+               "Braintree", "Wychavon", "Tower Hamlets", "Vale of White Horse",
+               "Tonbridge and Malling", "South Bucks")          
+subset_rows =  which(rownames(stan_post$reff) %in% target_las)
 
-\subsection{2017/2018 only}
+coefplot(stan_post$reff$mean[subset_rows], stan_post$reff$var[subset_rows],
+         varnames=rownames(stan_post$reff)[subset_rows], col="red", mar=c(1, 7, 5, 1),
+         main = "log Odds Ratio") 
 
-\N We next concentrate our attention on examining the results of model fitting to the 2017/2018 data only. This is because this will best inform ideas of sample size for future use.
-
-<<fit_model_2017_2018, echo=FALSE, results=hide>>=
-# mene_sample.df <- mene_sample.df[sample(nrow(mene.df),100),]
-mene_sample.df <- mene.df[mene.df$year == "Y1718",]
-mene_sample.df$la <- mene_sample.df$residence_localauthority
-duffer <- c(" ", "355", "356", "358", "359", "361", "362", "367", "368", "371", "372",
-"373", "374", "375")  
-for (duff in duffer) {mene_sample.df$la[mene_sample.df$la == duff] <- NA}
-mene_sample.df$la <- as.factor(mene_sample.df$la)
-mene_sample.df$la_number <- as.numeric(mene_sample.df$la)
-y = mene_sample.df$q1_binary
-current.na.action <- options('na.action')
-options(na.action='na.pass')
-X = model.matrix(~age + sex + seg + genhealth, mene_sample.df)
-dim(X)
-X <- cbind(X, mene_sample.df$la_number)
-dim(X)
-head(X)
-xy = cbind(y, X)
-dim(xy)
-xy <- na.omit(xy)
-dim(xy)
-y = xy[,1]
-X = xy[,-1]
-la_index <- xy[,ncol(xy)]
-X <- X[,-ncol(X)]
-head(X)
-options(na.action=current.na.action)
-stan_data = list(y=as.integer(y), X=X, N=length(y), K=dim(X)[2], la_index=la_index, N_las=max(la_index))
-library("rstan")
-rstan_options(auto_write = TRUE)
-options(mc.cores = parallel::detectCores())
-
-# fit <- stan(file = '../stan/simple_hierarchical_bernoulli_glm.stan', data = stan_data, chains=2)
-
-# m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm.stan')
-m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm.stan')
-f <- optimizing(m, data = stan_data, hessian = TRUE)
-post_mean = f$par[1:15]
-post_mean_la = f$par[16:360]
-post_var = sqrt(1 / (-1 * diag(f$hessian)[1:15]))
-post_var_la = sqrt(1 / (-1 * diag(f$hessian)[16:360]))
-names(post_mean) <- colnames(X)
-names(post_var) <- names(post_mean)
-cbind(post_mean, post_var)
-
-
-dict <- hash(c(1:length(levels(mene_sample.df$la))), levels(mene_sample.df$la))
-the_names <- vector(,length(unique(la_index)))
-for (i in la_index) {the_names[i] = values(dict, i)}
-names(post_mean_la) <- the_names
-cbind(post_mean_la, post_var_la)
 @
-
-
-\N Figure~\ref{ref_1718} depicts the overall ``caterpillar plot'' for all authorities, and figure~\ref{ref_1718_some} shows the exploded view. It appears that the intervals are indeed wider than the case for the all-data model.
-
-\begin{figure}
-<<catplot_2018, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
-n <- length(post_mean)
-plot(post_mean, c(1:n), pch=16, xlim = c(-5, 5), xlab="Log odds", ylab="", yaxt="n", bty="n")
-arrows(post_mean, c(1:n), post_mean + 1.96 * post_var, c(1:n), angle=0.0001, col="grey")
-arrows(post_mean, c(1:n), post_mean - 1.96 * post_var, c(1:n), angle=0.0001, col="grey")
-points(post_mean, c(1:n), col="red")
-text(-3, c(1:n), names(post_mean), pos=2, xpd=TRUE)
-@
-\label{ref_1718}
-\caption{Individual ``fixed'' effects for survey year March 2017 to February 2018}
-\end{figure}
-
-\begin{figure}
-<<catplot_2018, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
-orderit <- order(post_mean_la)
-length(orderit)
-plot(post_mean_la[orderit], c(1:345), pch=16, xlim = c(-15, +15), xlab="Log odds", ylab="", yaxt="n")
-arrows(post_mean_la[orderit], c(1:345), post_mean_la[orderit] + 1.96 * post_var_la[orderit], c(1:345), angle=0.0001, col="grey")
-arrows(post_mean_la[orderit], c(1:345), post_mean_la[orderit] - 1.96 * post_var_la[orderit], c(1:345), angle=0.0001, col="grey")
-points(post_mean_la[orderit], c(1:345), col="red")
-@
-\label{ref_1718_some}
-\caption{Local authority specific random effects for survey year March 2017 to February 2018}
-\end{figure}
+\label{q1_cat_zoom}
+\caption{Question 1 (trips in previous week): exploded view of posterior random effects for some authorities}
+\end{figure*}
 
 \newpage
 
-\N It is of interest also to consider the effect on the estimate of the individual level ``fixed effects''.  Figure~\ref{feff} summarises the posterior credible interval for the parameter estimates relating to individual characterstics.   These are as expected given the initial model screening.  There is a greater tendency to engage with the natural environment amongst those of better health, and the younger, and higher social  grouping. 
+\subsection{Question 1 (trips in last week) 2015/2016 only}
 
-\begin{figure}
-<<catplot_2018_selection, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
-plot(post_mean_la[orderit][101:110], c(1:10), pch=16, xlim = c(-4, +4), xlab="Log odds", ylab="", yaxt="n", bty="n")
-arrows(post_mean_la[orderit][101:110], c(1:10), post_mean_la[orderit][101:110] + 1.96 * post_var_la[orderit][101:110], c(1:10), angle=0.0001, col="grey")
-arrows(post_mean_la[orderit][101:110], c(1:10), post_mean_la[orderit][101:110] - 1.96 * post_var_la[orderit][101:110], c(1:10), angle=0.0001, col="grey")
-points(post_mean_la[orderit][101:110], c(1:10), col="red")
-text(-3.5, c(1:10), the_names[orderit][101:110], cex=0.75, pos=2, xpd=TRUE)
+\N In terms of evaluating the extent to which a reduced sample size, combined with small area methodology, might be feasible, results are based solely on data from survey year 2015/16. Whilst better small area estimates can be obtained from using as many years data as possible, using data from a single year should give a more conservative (more pessimistic) guide to the effect of potentially reducing sample size for a single year.
+
+
+<<q1_201516.R, echo=FALSE, results=hide>>=
+mene_sample.df <- mene.df[mene.df$year == "Y1516",]
+mene_sample.df <- create_la_index(mene_sample.df)
+la_dict <- hash(c(1:length(levels(mene_sample.df$la))), levels(mene_sample.df$la))
+
+stan_data <- format_hierarchical(mene_sample.df$q1_binary, mene_sample.df,
+"~ age + sex + age:sex + car + seg + marstat + ethnicity_5 + child_in_hh + adults_in_hh")
+post_reff_names <- label_las(la_dict, max(stan_data$la_index))
+
+m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm.stan')
+f_1516 <- optimizing(m, data = stan_data, hessian = TRUE)
+stan_post_1516=extract_bayesian_point_estimates(stan_data, f_1516, post_reff_names)
+
+@
+
+
+
+\begin{figure*}
+<<q1_compare_all_2015, echo=FALSE, results=hide, fig=TRUE>>=
+coefplot(stan_post$feff$mean[-1], stan_post$feff$var[-1], varnames=rownames(stan_post$feff[-1,]),
+         main = "log Odds Ratio", mar=c(1, 9, 5, 1))
+coefplot(stan_post_1516$feff$mean[-1], stan_post_1516$feff$var[-1], col="red", offset=0.1, add=TRUE)
+legend("topright", col=c("black", "red"), lwd=c(1,1),
+       legend=c("2009/10 to 15/16", "2015/16 only"), bty="n")
+
+@
+\caption{Question 1 (trips in last week): comparison of parameter (``fixed'') estimates from modelling all years 2009/10 to 2015/16 and using data solely for 2015/16}
+\label{q1_compare_bayes_freq}
+\end{figure*}
+
+
+\newpage
+
+\N In addition to the ``fixed'' effects plotted in figure~\ref{q1_compare_bayes_freq}, figure~\ref{ref_1516} and figure~\ref{ref_1516_some} depict the random effects.   An impression of the overall width of local authority related variation is given by figure~\ref{ref_1516}.    Figure~\ref{feff} shows the exploded view for the same arbitrarily chosen authorities as before. 
+
+
+\begin{figure*}
+<<q1_catplot_201516.R, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+ordering <- order(stan_post_1516$reff$mean)
+coefplot(stan_post_1516$reff$mean[ordering], stan_post_1516$reff$var[ordering],
+         col="red", v.axis=FALSE, mar=c(1, 1, 5, 1), main="log Odds Ratio") 
+
+@
+\label{ref_1516}
+\caption{Question 1 (trips in previous week): local authority specific random effects for survey year March 2017 to February 2018}
+\end{figure*}
+
+\newpage
+
+\N It is of interest also to consider the effect on the estimate of the individual level ``fixed effects''.  Figure~\ref{feff} summarises the posterior credible interval for the parameter estimates relating to individual characteristics.   These are as expected given the initial model screening.  There is a greater tendency to engage with the natural environment amongst those of better health, and the younger, and higher social  grouping. 
+
+\begin{figure*}
+<<q1_catplot_20516_zoom.R, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+target_las = c("East Cambridgeshire", "Hartlepool", "Maidstone", "Bury",
+               "Barrow-in-Furness", "Braintree", "Wychavon", "Tower Hamlets",
+               "Vale of White Horse", "Tonbridge and Malling",
+               "South Bucks")          
+subset_rows_1516 =  which(rownames(stan_post_1516$reff) %in% target_las)
+
+coefplot(stan_post_1516$reff$mean[subset_rows_1516],
+         stan_post_1516$reff$var[subset_rows_1516],
+         varnames=rownames(stan_post_1516$reff)[subset_rows_1516],
+         col="red", mar=c(1, 7, 5, 1), main = "log Odds Ratio") 
+coefplot(stan_post$reff$mean[subset_rows],
+         stan_post_1516$reff$var[subset_rows],
+         col="black", v.axis=FALSE, add = TRUE)
+legend("topright", lwd = c(1, 1), legend=c("2009-2016", "2015/16"),
+       col=c("black", "red"))
+
+
 @
 \label{feff}
-\caption{Expanded view of some local authority random effects from 2017/2018 survey year}
-\end{figure}
+\caption{Question 1 (trips in previous week): expanded view of some local authority random effects from 2017/2018 survey year}
+\end{figure*}
 
 \newpage
+
 \subsection{Exploring the effect of reduced sample size}
 
-\N We next consider taking a random subsample of the 2017/2018 data. Results presented here show an 80\% sample and then a 50\% sample.   It can be seen that the intervals are widening with the 50\% sample.
+\N For illustration purposes, a random sub-sample of the 2015/2016 data are taken. Results presented here show an 80\% sample and then a 50\% sample.   It can be seen that the intervals are widening with the 50\% sample.
 
-<<model_fit_0_8, echo=FALSE, results=hide>>=
-mene_sample.df <- mene.df[mene.df$year == "Y1718",]
-mene_sample.df <- mene_sample.df[sample(nrow(mene_sample.df),dim(mene_sample.df)[1] * 0.8),]
-dim(mene_sample.df)
-mene_sample.df$la <- mene_sample.df$residence_localauthority
-duffer <- c(" ", "355", "356", "358", "359", "361", "362", "367", "368", "371", "372",
-"373", "374", "375")  
-for (duff in duffer) {mene_sample.df$la[mene_sample.df$la == duff] <- NA}
-mene_sample.df$la <- as.factor(mene_sample.df$la)
-mene_sample.df$la_number <- as.numeric(mene_sample.df$la)
-y = mene_sample.df$q1_binary
-current.na.action <- options('na.action')
-options(na.action='na.pass')
-X = model.matrix(~age + sex + seg + genhealth, mene_sample.df)
-dim(X)
-X <- cbind(X, mene_sample.df$la_number)
-dim(X)
-head(X)
-xy = cbind(y, X)
-dim(xy)
-xy <- na.omit(xy)
-dim(xy)
-y = xy[,1]
-X = xy[,-1]
-la_index <- xy[,ncol(xy)]
-X <- X[,-ncol(X)]
-head(X)
-options(na.action=current.na.action)
-stan_data = list(y=as.integer(y), X=X, N=length(y), K=dim(X)[2], la_index=la_index, N_las=max(la_index))
-library("rstan")
-rstan_options(auto_write = TRUE)
-options(mc.cores = parallel::detectCores())
+<<q1_model_fit_0_8.R, echo=FALSE, results=hide>>=
+mene_sample_80.df <- mene.df[mene.df$year == "Y1516",]
+mene_sample_80.df <- mene_sample_80.df[sample(nrow(mene_sample_80.df),
+                                              dim(mene_sample_80.df)[1] * 0.8),]
+mene_sample_80.df <- create_la_index(mene_sample_80.df)
+la_dict_80 <- hash(c(1:length(levels(mene_sample_80.df$la))),
+                   levels(mene_sample_80.df$la))
+stan_data_80 <- format_hierarchical(mene_sample_80.df$q1_binary, mene_sample_80.df,
+"~ age + sex + age:sex + car + seg + marstat + ethnicity_5 + child_in_hh + adults_in_hh + year")
+post_reff_names_80 <- label_las(la_dict_80, max(stan_data_80$la_index))
 
-# fit <- stan(file = '../stan/simple_hierarchical_bernoulli_glm.stan', data = stan_data, chains=2)
+m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm.stan')
+f_80 <- optimizing(m, data = stan_data, hessian = TRUE)
+stan_post_1516_80=extract_bayesian_point_estimates(stan_data_80,
+                                                   f_80, post_reff_names_80)
 
-# m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm.stan')
+@
+
+<<q1_model_fit_0_5.R, echo=FALSE, results=hide>>=
+mene_sample_50.df <- mene.df[mene.df$year == "Y1516",]
+mene_sample_50.df <- mene_sample_50.df[sample(nrow(mene_sample_50.df),
+                                              dim(mene_sample_50.df)[1] * 0.5),]
+mene_sample_50.df <- create_la_index(mene_sample_50.df)
+la_dict_50 <- hash(c(1:length(levels(mene_sample_50.df$la))),
+                   levels(mene_sample_50.df$la))
+stan_data_50 <- format_hierarchical(mene_sample_50.df$q1_binary, mene_sample_50.df,
+"~ age + sex + age:sex + car + seg + marstat + ethnicity_5 + child_in_hh + adults_in_hh + year")
+post_reff_names_50 <- label_las(la_dict_50, max(stan_data_50$la_index))
+
+m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm.stan')
+f_50 <- optimizing(m, data = stan_data_50, hessian = TRUE)
+stan_post_1516_50=extract_bayesian_point_estimates(stan_data_50, f_50,
+                                                   post_reff_names_50)
+
+
+@
+
+\N Figure~\ref{fef_1516} compares the ``fixed'' effects estimates from the models fitted to all the 2015/16 data, an 80\% sample and a 50\% sample.   As the interval width increases, the precision of any small area estimates decreases.
+
+\begin{figure}
+<<q1_coefplot_201516_feffs_compare.R, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+coefplot(stan_post_1516$feff$mean[-1], stan_post_1516$feff$var[-1],
+         varnames=rownames(stan_post_1516$feff[-1]), mar=c(1, 6, 5, 1), main = "log Odds Ratio")
+coefplot(stan_post_1516_80$feff$mean[-1], stan_post_1516_80$feff$var[-1],
+         col="blue", offset=0.3, add=TRUE)
+coefplot(stan_post_1516_50$feff$mean[-1], stan_post_1516_50$feff$var[-1],
+         col="red", offset=-0.3, add=TRUE)
+legend("topright", col=c("black", "blue", "red"), lwd=c(1,1, 1),
+       legend=c("Survey year 15/16", "80% ", "50%"), bty="n")
+
+@
+\label{fef_1516}
+\caption{Question 1 (trips in last week): comparison of ``fixed'' effects for survey year March 2015 to February 2016 100\%, 80\% and 50\% subsample}
+\end{figure}
+
+\begin{figure*}
+<<catplot_201516_all.R, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+ordering <- order(stan_post_1516$reff$mean)
+coefplot(stan_post_1516$reff$mean[ordering], stan_post_1516$reff$var[ordering],
+         col="black", v.axis=FALSE, main = "log Odds Ratio", mar = c(1, 1, 5, 1), xlim=c(-10, 10)) 
+
+@
+\label{ref_1516_all}
+\caption{Q1 (trips in last week): local authority specific random effects for survey year March 2017 to February 2018 based on all data}
+\end{figure*}
+
+
+\newpage
+
+\begin{figure*}
+<<catplot_201516_80.R, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+ordering <- order(stan_post_1516_80$reff$mean)
+coefplot(stan_post_1516_80$reff$mean[ordering],
+         stan_post_1516_80$reff$var[ordering], col="blue", v.axis=FALSE, mar=c(1, 2, 4, 1),
+         main="log Odds Ratio", xlim=c(-10, 10)) 
+
+@
+\label{ref_1516_80}
+\caption{Question 1 (trips in last week): local authority specific random effects for survey year March 2015 to February 2016 based on 80\% subsample}
+\end{figure*}
+
+\begin{figure*}
+<<catplot_201516_50.R, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+ordering <- order(stan_post_1516_50$reff$mean)
+coefplot(stan_post_1516_50$reff$mean[ordering],
+         stan_post_1516_50$reff$var[ordering], col="red", v.axis=FALSE, mar=c(1, 2, 5, 1),
+         main = "log Odds Ratio", xlim=c(-10, 10)) 
+
+@
+\label{ref_1516_50}
+\caption{Question 1 (trips in previous week): local authority specific random effects for survey year March 2015 to February 2016 based on 50\% subsample}
+\end{figure*}
+
+
+\newpage
+
+\begin{figure*}
+<<catplot_201516_zoom.R, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+subset_rows_100 =  which(rownames(stan_post_1516$reff) %in% target_las)
+subset_rows_80 =  which(rownames(stan_post_1516_80$reff) %in% target_las)
+subset_rows_50 =  which(rownames(stan_post_1516_50$reff) %in% target_las)
+n_all = dim(mene.df)[1]
+n_201516 = dim(mene_sample.df)[1]
+n_80 = dim(mene_sample_80.df)[1]
+n_50 = dim(mene_sample_50.df)[1]
+
+coefplot(stan_post_1516$reff$mean[subset_rows_100], stan_post_1516$reff$var[subset_rows_100],
+         varnames=rownames(stan_post_1516$reff)[subset_rows_100], mar=c(1, 7, 5, 1),
+         main = "log Odds Ratio") 
+coefplot(stan_post_1516_80$reff$mean[subset_rows_80], stan_post_1516_80$reff$var[subset_rows_80],
+         col="blue", add=TRUE, offset=0.2) 
+coefplot(stan_post_1516_50$reff$mean[subset_rows_50], stan_post_1516_50$reff$var[subset_rows_50],
+         col="red", add=TRUE, offset=0.4) 
+legend("topright", col=c("red", "blue", "black"), lwd=c(1,1),
+       legend=c("50%", "80%", "100%"), bty="n")
+
+@
+\label{q1_reff_zoom}
+\caption{Question 1 (trips in last week): expanded view of selected local authority random effects from 2017/2018 survey year under all, 80\% and 50\% sampling}
+\end{figure*}
+
+
+\newpage
+
+
+\begin{table}
+\begin{tabular}{rrrr}
+  2009/10 - 2015/16 &  \Sexpr{n_all}\\
+  2015/16 100\% sample & \Sexpr{n_201516} \\
+  2015/16 80\% sample & \Sexpr{n_80}\\
+  2015/16 50\% sample & \Sexpr{n_50}\\
+\end{tabular}
+\caption{Sample size (number of data point from MENE survey used to fit models to Q1}
+\end{table}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Q 17
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+<<q17_model_fit.R, results=hide, echo=FALSE, fig=FALSE>>=
+la_dict <- hash(c(1:length(levels(mene.df$la))), levels(mene.df$la))
+
+frequentist_m17 <- glm(
+    q17_binary ~ age + sex + age:sex + car + seg + marstat + ethnicity_5 + child_in_hh + adults_in_hh + year,
+    data = mene.df, family = binomial, na.action=na.omit)
+
+stan_data <- format_hierarchical(mene.df$q17_binary, mene.df,
+"~ age + sex + age:sex + car + seg + marstat + ethnicity_5 + child_in_hh + adults_in_hh + year")
+post_reff_names <- label_las(la_dict, max(stan_data$la_index))
+
 m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm.stan')
 f <- optimizing(m, data = stan_data, hessian = TRUE)
-post_mean = f$par[1:15]
-post_mean_la = f$par[16:360]
-post_var = sqrt(1 / (-1 * diag(f$hessian)[1:15]))
-post_var_la = sqrt(1 / (-1 * diag(f$hessian)[16:360]))
-names(post_mean) <- colnames(X)
-names(post_var) <- names(post_mean)
-cbind(post_mean, post_var)
+stan_post=extract_bayesian_point_estimates(stan_data, f, post_reff_names)
 
-
-dict <- hash(c(1:length(levels(mene_sample.df$la))), levels(mene_sample.df$la))
-the_names <- vector(,length(unique(la_index)))
-for (i in la_index) {the_names[i] = values(dict, i)}
-names(post_mean_la) <- the_names
-cbind(post_mean_la, post_var_la)
 @
 
-\begin{figure}
-<<catplot_2018, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
-n <- length(post_mean)
-plot(post_mean, c(1:n), pch=16, xlim = c(-5, 5), xlab="Log odds", ylab="", yaxt="n", bty="n")
-arrows(post_mean, c(1:n), post_mean + 1.96 * post_var, c(1:n), angle=0.0001, col="grey")
-arrows(post_mean, c(1:n), post_mean - 1.96 * post_var, c(1:n), angle=0.0001, col="grey")
-points(post_mean, c(1:n), col="red")
-text(-3, c(1:n), names(post_mean), pos=2, xpd=TRUE)
+\subsection{Q17 (trips in the last week): fitting a model to the entire data set}
+
+\N The first set of plots summarise the results of fitting a plot to the entire data set from survey year 2009/2010 through to 2015/2016. In other words, this uses data from all survey years where a question was asked about car availability.   Figure~\ref{q17_compare_bayes_freq} is a visual summary of the parameter estimates (in terms of log-odds) that have been obtained from the conventional model reported in the previous section and a fully Bayesian model used for small area estimation. It appears that there is good but not perfect agreement in terms of the parameter estimates.  It should be noted however that perfect agreement would not be expected as these are not \emph{exactly} the same model.  The Bayesian model contains a random effect for each local authority.
+
+
+\N Figure~\ref{q17_cat_all_years} depicts a so-called ``caterpillar plot'' of the random effects for each of the local authorities obtained from the Bayesian model. This is a visual summary of the 95\% posterior credible interval of the random effect in units of ``log odds''.   The names of the individual local authorities are not given in this plot for cosmetic reasons (they would be too small to read), however figure~\ref{q17_cat_zoom} will ``zoom'' in on a subset.   The reason for providing this plot is to give some idea of the authority by authority random effects, and to indicate how much variation in trip taking could be explained by well chosen authority specific predictor variables. There are some data anomalies. In some cases, the local authority has not been identified, and the plot shows extremely wide intervals estimates. However, this picture is intended as a way of evaluating the typical width of a credible interval for any unmodelled local authority specific effect on the number of trips reported in the previous week.
+
+
+
+\begin{figure*}
+<<q17_compare_freq_bayes, echo=FALSE, results=hide, fig=TRUE>>=
+coefplot(frequentist_m1, main = "log Odds Ratio", mar=c(1, 7, 6, 1))
+coefplot(stan_post$feff$mean[-1], stan_post$feff$var[-1], col="red", offset=0.2,
+         add=TRUE)
+legend("topright", col=c("black", "red"), lwd=c(1,1),
+       legend=c("Conventional", "Multilevel Bayesian"), bty="n")
+
 @
-\caption{Individual ``fixed'' effects for survey year March 2017 to February 2018, 80\% sample}
-\end{figure}
+\caption{Question 1 (trips in last week): comparison of parameter (``fixed'') estimates from frequentist (conventional) and multilevel Bayesian model fitted to Question 1}
+\label{q17_compare_bayes_freq}
+\end{figure*}
 
-\begin{figure}
-<<catplot_0_8, fig=TRUE, echo=FALSE, results=hide, width=6, height=8>>=
-orderit <- order(post_mean_la)
-n <- length(orderit)
-plot(post_mean_la[orderit], c(1:n), pch=16, xlim = c(-10, 10), xlab="Log odds", ylab="", yaxt="n")
-arrows(post_mean_la[orderit], c(1:n), post_mean_la[orderit] + 1.96 * post_var_la[orderit], c(1:n), angle=0.0001, col="grey")
-arrows(post_mean_la[orderit], c(1:345), post_mean_la[orderit] - 1.96 * post_var_la[orderit], c(1:n), angle=0.0001, col="grey")
-points(post_mean_la[orderit], c(1:n), col="red")
+
+
+\begin{figure*}
+<<q17_catplot_full, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+ordering <- order(stan_post$reff$mean)
+coefplot(stan_post$reff$mean[ordering], stan_post$reff$var[ordering], col="red", varnames="",
+         main = "log Odds Ratio", mar=c(1, 1, 5, 1)) 
 @
-\caption{Posterior 95\% credible intervals from fitting models to randomly selected 80\% subset of the 2017/2018 data}
-\end{figure}
+\label{q17_cat_all_years}
+\caption{Question 1 (trips in last week): summary of interval estimates for local Authority Random effects from Bayesian model}
+\end{figure*}
+
+\N As a means of making the results more interpretable, figure~\ref{q17_cat_zoom} summarises the posterior credible interval for an \emph{arbitrarily chosen} selection of local authorities. The precision of the final small area estimates is a function of the width of these intervals. As noted in the previous section, it would be possible to model these in turn, using predictor variables that have social or geographic relevance and even to allow for spatial autocorrelation (to allow neighbouring areas to be similar in ways that are not explained by explicit numerical variables).
 
 
-\begin{figure}
-<<cat_plot_exploded_2018_80, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
-plot(post_mean_la[orderit][101:110], c(1:10), pch=16, xlim = c(-4, +4), xlab="Log odds", ylab="", yaxt="n", bty="n")
-arrows(post_mean_la[orderit][101:110], c(1:10), post_mean_la[orderit][101:110] + 1.96 * post_var_la[orderit][101:110], c(1:10), angle=0.0001, col="grey")
-arrows(post_mean_la[orderit][101:110], c(1:10), post_mean_la[orderit][101:110] - 1.96 * post_var_la[orderit][101:110], c(1:10), angle=0.0001, col="grey")
-points(post_mean_la[orderit][101:110], c(1:10), col="red")
-text(-3.5, c(1:10), the_names[orderit][101:110], cex=0.75, pos=2, xpd=TRUE)
+\begin{figure*}
+<<q17_catplot_full_zoom.R, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+target_las = c("East Cambridgeshire", "Hartlepool", "Maidstone", "Bury", "Barrow-in-Furness",
+               "Braintree", "Wychavon", "Tower Hamlets", "Vale of White Horse",
+               "Tonbridge and Malling", "South Bucks")          
+subset_rows =  which(rownames(stan_post$reff) %in% target_las)
+
+coefplot(stan_post$reff$mean[subset_rows], stan_post$reff$var[subset_rows],
+         varnames=rownames(stan_post$reff)[subset_rows], col="red", mar=c(1, 7, 5, 1),
+         main = "log Odds Ratio") 
+
 @
-\caption{Selected zoom in to posterior 95\% credible intervals from fitting models to randomly selected 80\% subset of the 2017/2018 data}
-\end{figure}
+\label{q17_cat_zoom}
+\caption{Question 1 (trips in previous week): exploded view of posterior random effects for some authorities}
+\end{figure*}
+
+\newpage
+
+\subsection{Question 1 (trips in last week) 2015/2016 only}
+
+\N In terms of evaluating the extent to which a reduced sample size, combined with small area methodology, might be feasible, results are based solely on data from survey year 2015/16. Whilst better small area estimates can be obtained from using as many years data as possible, using data from a single year should give a more conservative (more pessimistic) guide to the effect of potentially reducing sample size for a single year.
 
 
+<<q17_201516.R, echo=FALSE, results=hide>>=
+mene_sample.df <- mene.df[mene.df$year == "Y1516",]
+mene_sample.df <- create_la_index(mene_sample.df)
+la_dict <- hash(c(1:length(levels(mene_sample.df$la))), levels(mene_sample.df$la))
 
+stan_data <- format_hierarchical(mene_sample.df$q17_binary, mene_sample.df,
+"~ age + sex + age:sex + car + seg + marstat + ethnicity_5 + child_in_hh + adults_in_hh")
+post_reff_names <- label_las(la_dict, max(stan_data$la_index))
 
-<<model_fit_2018_50, echo=FALSE, results=hide>>=
-mene_sample.df <- mene.df[mene.df$year == "Y1718",]
-mene_sample.df <- mene_sample.df[sample(nrow(mene_sample.df),dim(mene_sample.df)[1] * 0.5),]
-dim(mene_sample.df)
-mene_sample.df$la <- mene_sample.df$residence_localauthority
-duffer <- c(" ", "355", "356", "358", "359", "361", "362", "367", "368", "371", "372",
-"373", "374", "375")  
-for (duff in duffer) {mene_sample.df$la[mene_sample.df$la == duff] <- NA}
-mene_sample.df$la <- as.factor(mene_sample.df$la)
-mene_sample.df$la_number <- as.numeric(mene_sample.df$la)
-y = mene_sample.df$q1_binary
-current.na.action <- options('na.action')
-options(na.action='na.pass')
-X = model.matrix(~age + sex + seg + genhealth, mene_sample.df)
-dim(X)
-X <- cbind(X, mene_sample.df$la_number)
-dim(X)
-head(X)
-xy = cbind(y, X)
-dim(xy)
-xy <- na.omit(xy)
-dim(xy)
-y = xy[,1]
-X = xy[,-1]
-la_index <- xy[,ncol(xy)]
-X <- X[,-ncol(X)]
-head(X)
-options(na.action=current.na.action)
-stan_data = list(y=as.integer(y), X=X, N=length(y), K=dim(X)[2], la_index=la_index, N_las=max(la_index))
-library("rstan")
-rstan_options(auto_write = TRUE)
-options(mc.cores = parallel::detectCores())
-
-# fit <- stan(file = '../stan/simple_hierarchical_bernoulli_glm.stan', data = stan_data, chains=2)
-
-# m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm.stan')
 m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm.stan')
-f <- optimizing(m, data = stan_data, hessian = TRUE)
-post_mean = f$par[1:15]
-post_mean_la = f$par[16:360]
-post_var = sqrt(1 / (-1 * diag(f$hessian)[1:15]))
-post_var_la = sqrt(1 / (-1 * diag(f$hessian)[16:360]))
-names(post_mean) <- colnames(X)
-names(post_var) <- names(post_mean)
-cbind(post_mean, post_var)
+f_1516 <- optimizing(m, data = stan_data, hessian = TRUE)
+stan_post_1516=extract_bayesian_point_estimates(stan_data, f_1516, post_reff_names)
+
+@
 
 
-dict <- hash(c(1:length(levels(mene_sample.df$la))), levels(mene_sample.df$la))
-the_names <- vector(,length(unique(la_index)))
-for (i in la_index) {the_names[i] = values(dict, i)}
-names(post_mean_la) <- the_names
-cbind(post_mean_la, post_var_la)
+
+\begin{figure*}
+<<q17_compare_all_2015, echo=FALSE, results=hide, fig=TRUE>>=
+coefplot(stan_post$feff$mean[-1], stan_post$feff$var[-1], varnames=rownames(stan_post$feff[-1,]),
+         main = "log Odds Ratio", mar=c(1, 9, 5, 1))
+coefplot(stan_post_1516$feff$mean[-1], stan_post_1516$feff$var[-1], col="red", offset=0.1, add=TRUE)
+legend("topright", col=c("black", "red"), lwd=c(1,1),
+       legend=c("2009/10 to 15/16", "2015/16 only"), bty="n")
+
+@
+\caption{Question 1 (trips in last week): comparison of parameter (``fixed'') estimates from modelling all years 2009/10 to 2015/16 and using data solely for 2015/16}
+\label{q17_compare_bayes_freq}
+\end{figure*}
 
 
+\newpage
+
+\N In addition to the ``fixed'' effects plotted in figure~\ref{q17_compare_bayes_freq}, figure~\ref{ref_1516} and figure~\ref{ref_1516_some} depict the random effects.   An impression of the overall width of local authority related variation is given by figure~\ref{ref_1516}.    Figure~\ref{feff} shows the exploded view for the same arbitrarily chosen authorities as before. 
+
+
+\begin{figure*}
+<<q17_catplot_201516.R, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+ordering <- order(stan_post_1516$reff$mean)
+coefplot(stan_post_1516$reff$mean[ordering], stan_post_1516$reff$var[ordering],
+         col="red", v.axis=FALSE, mar=c(1, 1, 5, 1), main="log Odds Ratio") 
+
+@
+\label{ref_1516}
+\caption{Question 1 (trips in previous week): local authority specific random effects for survey year March 2017 to February 2018}
+\end{figure*}
+
+\newpage
+
+\N It is of interest also to consider the effect on the estimate of the individual level ``fixed effects''.  Figure~\ref{feff} summarises the posterior credible interval for the parameter estimates relating to individual characteristics.   These are as expected given the initial model screening.  There is a greater tendency to engage with the natural environment amongst those of better health, and the younger, and higher social  grouping. 
+
+\begin{figure*}
+<<q17_catplot_20516_zoom.R, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+target_las = c("East Cambridgeshire", "Hartlepool", "Maidstone", "Bury",
+               "Barrow-in-Furness", "Braintree", "Wychavon", "Tower Hamlets",
+               "Vale of White Horse", "Tonbridge and Malling",
+               "South Bucks")          
+subset_rows_1516 =  which(rownames(stan_post_1516$reff) %in% target_las)
+
+coefplot(stan_post_1516$reff$mean[subset_rows_1516],
+         stan_post_1516$reff$var[subset_rows_1516],
+         varnames=rownames(stan_post_1516$reff)[subset_rows_1516],
+         col="red", mar=c(1, 7, 5, 1), main = "log Odds Ratio") 
+coefplot(stan_post$reff$mean[subset_rows],
+         stan_post_1516$reff$var[subset_rows],
+         col="black", v.axis=FALSE, add = TRUE)
+legend("topright", lwd = c(1, 1), legend=c("2009-2016", "2015/16"),
+       col=c("black", "red"))
 
 
 @
+\label{feff}
+\caption{Question 1 (trips in previous week): expanded view of some local authority random effects from 2017/2018 survey year}
+\end{figure*}
+
+\newpage
+
+\subsection{Exploring the effect of reduced sample size}
+
+\N For illustration purposes, a random sub-sample of the 2015/2016 data are taken. Results presented here show an 80\% sample and then a 50\% sample.   It can be seen that the intervals are widening with the 50\% sample.
+
+<<q17_model_fit_0_8.R, echo=FALSE, results=hide>>=
+mene_sample_80.df <- mene.df[mene.df$year == "Y1516",]
+mene_sample_80.df <- mene_sample_80.df[sample(nrow(mene_sample_80.df),
+                                              dim(mene_sample_80.df)[1] * 0.8),]
+mene_sample_80.df <- create_la_index(mene_sample_80.df)
+la_dict_80 <- hash(c(1:length(levels(mene_sample_80.df$la))),
+                   levels(mene_sample_80.df$la))
+stan_data_80 <- format_hierarchical(mene_sample_80.df$q17_binary, mene_sample_80.df,
+"~ age + sex + age:sex + car + seg + marstat + ethnicity_5 + child_in_hh + adults_in_hh + year")
+post_reff_names_80 <- label_las(la_dict_80, max(stan_data_80$la_index))
+
+m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm.stan')
+f_80 <- optimizing(m, data = stan_data, hessian = TRUE)
+stan_post_1516_80=extract_bayesian_point_estimates(stan_data_80,
+                                                   f_80, post_reff_names_80)
+
+@
+
+<<q17_model_fit_0_5.R, echo=FALSE, results=hide>>=
+mene_sample_50.df <- mene.df[mene.df$year == "Y1516",]
+mene_sample_50.df <- mene_sample_50.df[sample(nrow(mene_sample_50.df),
+                                              dim(mene_sample_50.df)[1] * 0.5),]
+mene_sample_50.df <- create_la_index(mene_sample_50.df)
+la_dict_50 <- hash(c(1:length(levels(mene_sample_50.df$la))),
+                   levels(mene_sample_50.df$la))
+stan_data_50 <- format_hierarchical(mene_sample_50.df$q17_binary, mene_sample_50.df,
+"~ age + sex + age:sex + car + seg + marstat + ethnicity_5 + child_in_hh + adults_in_hh + year")
+post_reff_names_50 <- label_las(la_dict_50, max(stan_data_50$la_index))
+
+m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm.stan')
+f_50 <- optimizing(m, data = stan_data_50, hessian = TRUE)
+stan_post_1516_50=extract_bayesian_point_estimates(stan_data_50, f_50,
+                                                   post_reff_names_50)
+
+
+@
+
+\N Figure~\ref{fef_1516} compares the ``fixed'' effects estimates from the models fitted to all the 2015/16 data, an 80\% sample and a 50\% sample.   As the interval width increases, the precision of any small area estimates decreases.
 
 \begin{figure}
-<<catplot_2018_50_full, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
-orderit <- order(post_mean_la)
-n <- length(orderit)
-plot(post_mean_la[orderit], c(1:n), pch=16, xlim = c(-15, +15), xlab="Log odds", ylab="", yaxt="n")
-arrows(post_mean_la[orderit], c(1:n), post_mean_la[orderit] + 1.96 * post_var_la[orderit], c(1:n), angle=0.0001, col="grey")
-arrows(post_mean_la[orderit], c(1:345), post_mean_la[orderit] - 1.96 * post_var_la[orderit], c(1:n), angle=0.0001, col="grey")
-points(post_mean_la[orderit], c(1:n), col="red")
+<<q17_coefplot_201516_feffs_compare.R, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+coefplot(stan_post_1516$feff$mean[-1], stan_post_1516$feff$var[-1],
+         varnames=rownames(stan_post_1516$feff[-1]), mar=c(1, 6, 5, 1), main = "log Odds Ratio")
+coefplot(stan_post_1516_80$feff$mean[-1], stan_post_1516_80$feff$var[-1],
+         col="blue", offset=0.3, add=TRUE)
+coefplot(stan_post_1516_50$feff$mean[-1], stan_post_1516_50$feff$var[-1],
+         col="red", offset=-0.3, add=TRUE)
+legend("topright", col=c("black", "blue", "red"), lwd=c(1,1, 1),
+       legend=c("Survey year 15/16", "80% ", "50%"), bty="n")
+
 @
-\caption{Posterior 95\% credible intervals from fitting models to randomly selected 50\% subset of the 2017/2018 data}
+\label{fef_1516}
+\caption{Question 1 (trips in last week): comparison of ``fixed'' effects for survey year March 2015 to February 2016 100\%, 80\% and 50\% subsample}
 \end{figure}
 
+\begin{figure*}
+<<catplot_201516_all.R, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+ordering <- order(stan_post_1516$reff$mean)
+coefplot(stan_post_1516$reff$mean[ordering], stan_post_1516$reff$var[ordering],
+         col="black", v.axis=FALSE, main = "log Odds Ratio", mar = c(1, 1, 5, 1), xlim=c(-10, 10)) 
 
-\begin{figure}
-<<catplot_2018_50_zoom, fig=TRUE, echo=FALSE, results=hide, width=6, height=8>>=
-plot(post_mean_la[orderit][101:110], c(1:10), pch=16, xlim = c(-4, +4), xlab="Log odds", ylab="", yaxt="n", bty="n")
-arrows(post_mean_la[orderit][101:110], c(1:10), post_mean_la[orderit][101:110] + 1.96 * post_var_la[orderit][101:110], c(1:10), angle=0.0001, col="grey")
-arrows(post_mean_la[orderit][101:110], c(1:10), post_mean_la[orderit][101:110] - 1.96 * post_var_la[orderit][101:110], c(1:10), angle=0.0001, col="grey")
-points(post_mean_la[orderit][101:110], c(1:10), col="red")
-text(-3.5, c(1:10), the_names[orderit][101:110], cex=0.75, pos=2, xpd=TRUE)
 @
-\caption{Selected zoom in to posterior 95\% credible intervals from fitting models to randomly selected 50\% subset of the 2017/2018 data}
-\end{figure}
+\label{ref_1516_all}
+\caption{Q17 (trips in last week): local authority specific random effects for survey year March 2017 to February 2018 based on all data}
+\end{figure*}
 
-\begin{figure}
-<<catplot_2018, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
-n <- length(post_mean)
-plot(post_mean, c(1:n), pch=16, xlim = c(-5, 5), xlab="Log odds", ylab="", yaxt="n", bty="n")
-arrows(post_mean, c(1:n), post_mean + 1.96 * post_var, c(1:n), angle=0.0001, col="grey")
-arrows(post_mean, c(1:n), post_mean - 1.96 * post_var, c(1:n), angle=0.0001, col="grey")
-points(post_mean, c(1:n), col="red")
-text(-3, c(1:n), names(post_mean), pos=2, xpd=TRUE)
+
+\newpage
+
+\begin{figure*}
+<<catplot_201516_80.R, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+ordering <- order(stan_post_1516_80$reff$mean)
+coefplot(stan_post_1516_80$reff$mean[ordering],
+         stan_post_1516_80$reff$var[ordering], col="blue", v.axis=FALSE, mar=c(1, 2, 4, 1),
+         main="log Odds Ratio", xlim=c(-10, 10)) 
+
 @
-\caption{Individual ``fixed'' effects for survey year March 2017 to February 2018, 50\% sample}
-\end{figure}
+\label{ref_1516_80}
+\caption{Question 1 (trips in last week): local authority specific random effects for survey year March 2015 to February 2016 based on 80\% subsample}
+\end{figure*}
 
+\begin{figure*}
+<<catplot_201516_50.R, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+ordering <- order(stan_post_1516_50$reff$mean)
+coefplot(stan_post_1516_50$reff$mean[ordering],
+         stan_post_1516_50$reff$var[ordering], col="red", v.axis=FALSE, mar=c(1, 2, 5, 1),
+         main = "log Odds Ratio", xlim=c(-10, 10)) 
+
+@
+\label{ref_1516_50}
+\caption{Question 1 (trips in previous week): local authority specific random effects for survey year March 2015 to February 2016 based on 50\% subsample}
+\end{figure*}
+
+
+\newpage
+
+\begin{figure*}
+<<catplot_201516_zoom.R, echo=FALSE, results=hide, fig=TRUE, width=6, height=8>>=
+subset_rows_100 =  which(rownames(stan_post_1516$reff) %in% target_las)
+subset_rows_80 =  which(rownames(stan_post_1516_80$reff) %in% target_las)
+subset_rows_50 =  which(rownames(stan_post_1516_50$reff) %in% target_las)
+n_all = dim(mene.df)[1]
+n_201516 = dim(mene_sample.df)[1]
+n_80 = dim(mene_sample_80.df)[1]
+n_50 = dim(mene_sample_50.df)[1]
+
+coefplot(stan_post_1516$reff$mean[subset_rows_100], stan_post_1516$reff$var[subset_rows_100],
+         varnames=rownames(stan_post_1516$reff)[subset_rows_100], mar=c(1, 7, 5, 1),
+         main = "log Odds Ratio") 
+coefplot(stan_post_1516_80$reff$mean[subset_rows_80], stan_post_1516_80$reff$var[subset_rows_80],
+         col="blue", add=TRUE, offset=0.2) 
+coefplot(stan_post_1516_50$reff$mean[subset_rows_50], stan_post_1516_50$reff$var[subset_rows_50],
+         col="red", add=TRUE, offset=0.4) 
+legend("topright", col=c("red", "blue", "black"), lwd=c(1,1),
+       legend=c("50%", "80%", "100%"), bty="n")
+
+@
+\label{q17_reff_zoom}
+\caption{Question 1 (trips in last week): expanded view of selected local authority random effects from 2017/2018 survey year under all, 80\% and 50\% sampling}
+\end{figure*}
+
+
+\newpage
+
+
+\begin{table}
+\begin{tabular}{rrrr}
+  2009/10 - 2015/16 &  \Sexpr{n_all}\\
+  2015/16 100\% sample & \Sexpr{n_201516} \\
+  2015/16 80\% sample & \Sexpr{n_80}\\
+  2015/16 50\% sample & \Sexpr{n_50}\\
+\end{tabular}
+\caption{Sample size (number of data point from MENE survey used to fit models to Q17}
+\end{table}

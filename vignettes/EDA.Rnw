@@ -232,7 +232,7 @@ print(sam_marstat, include.colnames=FALSE, format.args=list(big.mark=","))
 
 \subsection{Disability}
 
-\N Tables~\ref{mene_disability} and \ref{sam_disability} depict the classification of self reported disability status by MENE survey and SAM.  These could be difficult to reconcile, as we have no way of understanding how a person who entered some limitations on the census would have recorded a binary indicator on the MENE survey. This is a known problem when attemption to reconcile the 2001 census (which also has a yes/no classification) with the 2011 census.   For the feasibility study, this variable will be ignored. If, as seems likely, it is an important predictor of engagement with the natural environment it could be included in future use, but this would require a degree of validation as to how best to map ``disabled / not disabled'' MENE responses onto ``limited a little'', ``limited a lot'', ``not limited'' SAM responses.
+\N Tables~\ref{mene_disability} and \ref{sam_disability} depict the classification of self reported disability status by MENE survey and SAM.  These could be difficult to reconcile, as we have no way of understanding how a person who entered some limitations on the census would have recorded a binary indicator on the MENE survey. Specifically, it may be that some people who on the census regard themselves as ``limited a little'' would not indicate ``Yes'' to a question on disability in the MENE survey.  This is a known problem when attemption to reconcile the 2001 census (which also has a yes/no classification for limiting long term illness) with the 2011 census.   For the feasibility study, this variable will be ignored. If, as seems likely, it is an important predictor of engagement with the natural environment it could be included in future use, but this would require a degree of validation as to how best to map ``disabled / not disabled'' MENE responses onto ``limited a little'', ``limited a lot'', ``not limited'' SAM responses.  This could potentially be possibly using a latent variable construnction (where we posit an underlying latent or hidden variable which ``measures'' disability level on a continuous numeric scale and attempt to estimate cut points which identify above and below which someone on MENE identifies as having a disability and someone on SAM reports themself as having no, little or very limiting long term illness.   The conclusions will recommend that there could be great value in ensuring in future that MENE survey questions align closely with definitions found in such auxiliary data as the census.
 
 <<mene_disability, fig=FALSE, results=tex, echo=FALSE>>=
 mene_disability <- xtable(with(mene.df, xtabs(~disability, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by self-reported disability status", label="mene_disability", auto=TRUE)
@@ -263,8 +263,6 @@ mene_disability_year <- xtable(with(mene.df, xtabs(~year + disability, exclude=N
 print(mene_disability_year, include.colnames=TRUE, format.args=list(big.mark=","))
 @
 
->>>>>>> 8fdd48e8f7c274b1bc5c4a7c8a114264dbb2a3ce
-.
 \clearpage
 
 \subsection{Family structure}
