@@ -16,9 +16,9 @@ mene_factors <- function(mene.df) {
   mene.df$adults_in_hh <- handle_nas(mene.df$adults_in_hh)
   mene.df$child_in_hh <- handle_nas(mene.df$child_in_hh)
   mene.df$hh_size <- handle_nas(mene.df$hh_size)
-  mene.df$workstat <- handle_nas(mene.df$workstat)
+  mene.df$workstat <- handle_nas(mene.df$workstat5)
   mene.df$car <- handle_nas(mene.df$car)
-  mene.df$genhealth <- addNA(factor(mene.df$generalhealth, levels = c("Don't know", "Very bad", "Bad", "Fair", "Good", "Very good"), , exclude=NULL))
+  mene.df$genhealth <- addNA(factor(mene.df$general_health, levels = c("Don't know", "Very bad", "Bad", "Fair", "Good", "Very good"), , exclude=NULL))
   return(mene.df)
 }
 

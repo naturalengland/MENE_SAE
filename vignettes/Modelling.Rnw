@@ -5,7 +5,7 @@ source("../R/sanitize_mene.R")
 mene.df <- mene_factors(mene.df)
 mene.df <- mene_code_q1(mene.df)
 mene.df <- mene_code_q17(mene.df)
-mene.df <- mene.df[mene.df$year != "Y1617" & mene.df$year != "Y1718",]
+mene.df <- mene.df[mene.df$survey_year != "Y1617" & mene.df$survey_year != "Y1718",]
 require(arm)
 require(xtable)
 require(effects)
@@ -25,21 +25,21 @@ invlogit <- function(x){return(1 / (1 + exp(-1 * x)))}
 \subsection{Model fitting to two dichotomised outcomes}
 
  
-\N The response to MENE survey Question 1 records the number of trips taken in the past seven days.  Question 17 has been dichotomised as at least one trip a month.   A much smaller number of respondents reply to Q17 than do to Q1. For the purposes of this feasibility study, we have modelled both as a binary indicator, equal to $0$ if either no trips in the last seven days, or a trip frequency of less than once a month in the previous year year.   The outcome was denotes as $1$ if at least one trip had been made in the last seven days or the trip frequency was at least one trip a month in the previous year.   A response ``1'' therefore indicates the positive outcome and all parameter estimates can be interpreted in that regard.
+\N The response to MENE survey Question 1 records the number of trips taken in the past seven days.  Question 17 has been dichotomised as at least one trip a month.   A much smaller number of respondents reply to Q17 than do to Q1. For the purposes of this feasibility study, we have modelled both as a binary indicator, equal to $0$ if either no trips in the last seven days, or a trip frequency of less than once a month in the previous year.   The outcome was denotes as $1$ if at least one trip had been made in the last seven days or the trip frequency was at least one trip a month in the previous year.   A response ``1'' therefore indicates the positive outcome and all parameter estimates can be interpreted in that regard.
 
 \N All the available predictors were examined, including two way interactions.   Parameter estimates from the finally selected model are given in table~\ref{coefs} and a  visual summary is subsequently given in figure~\ref{coefplot_q1_q17} (along with 95\% and 90\% confidence intervals for the parameter estimates).
 
 <<fitmodels, fig=FALSE, echo=FALSE, results=hide>>=
-mene.df$year <- factor(mene.df$year, levels = c("Y0910", "Y1011", "Y1112", "Y1213", "Y1314", "Y1415", "Y1516"))
+mene.df$survey_year <- factor(mene.df$survey_year, levels = c("Y0910", "Y1011", "Y1112", "Y1213", "Y1314", "Y1415", "Y1516"))
 mene.df$marstat[mene.df$marstat == "NA"] <- NA
 mene.df$marstat <- droplevels(mene.df$marstat)
 mene.df$marstat <- relevel(mene.df$marstat, ref="Single")
 mene.df$child_in_hh <- relevel(mene.df$child_in_hh, ref="None")
 
-m1 <- glm(q1_binary ~ age + sex + age:sex + car + seg + marstat + ethnicity_5 + child_in_hh + adults_in_hh + year, 
-          family = binomial, data = mene.df[mene.df$year != "Y1617" | mene.df$year != "Y1718",])
-m17 <- glm(q17_binary ~ age + sex + age:sex + car + seg + marstat + ethnicity_5 + child_in_hh + adults_in_hh + year, 
-          family = binomial, data = mene.df[mene.df$year != "Y1617" | mene.df$year != "Y1718",])
+m1 <- glm(q1_binary ~ age + sex + age:sex + car + seg + marstat + ethnicity_5 + child_in_hh + adults_in_hh + survey_year, 
+          family = binomial, data = mene.df[mene.df$survey_year != "Y1617" | mene.df$survey_year != "Y1718",])
+m17 <- glm(q17_binary ~ age + sex + age:sex + car + seg + marstat + ethnicity_5 + child_in_hh + adults_in_hh + survey_year, 
+          family = binomial, data = mene.df[mene.df$survey_year != "Y1617" | mene.df$survey_year != "Y1718",])
 @
 
 \begin{figure*}
@@ -106,7 +106,7 @@ coefplot(m1, mar=c(1, 7, 4, 1), main="")
 coefplot(m17, mar=c(1, 7, 4, 1), main="", add=TRUE, col="red", offset=-0.3)
 legend("topright", lwd=1, col = c("black", "red"), legend = c("Q1", "Q17"), bty = "n")
 @
-\label{coefplot_q1}
+\label{coefplot_q1_q17}
 \caption[Parameter estimates][-1in]{Parameter estimates (log odds ratios) from model fitted to Dichotomised Q1 (trips taken in the last seven days) and Dichotomised Q17 (at least one trip a month in the last year)}
 \end{figure*}
 

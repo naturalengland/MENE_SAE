@@ -7,7 +7,7 @@
 \usepackage{natbib}
 \bibliographystyle{chicago}
 \usepackage{tikz}
-\usetikzlibrary{positioning,calc,shapes}
+\usetikzlibrary{positioning,calc,shapes,decorations.pathreplacing,shapes}
 \usepackage{hyperref}
 \usepackage{float} % allows figure inside minipage
 % \usepackage[xindy,toc]{glossaries}
@@ -18,7 +18,7 @@
 \newcommand{\N}{%
   \noindent\refstepcounter{parnum}%
   \makebox[\parindent][l]{\textbf{\arabic{parnum}.}}}
-\setlength{\parindent}{100em}
+\setlength{\parindent}{160em}
 
 % Use a generous paragraph indent so numbers can be fit inside the
 % indentation space.
@@ -122,9 +122,9 @@
 
 \newpage
 \begin{tabular}{ll}
-{\color{blue}Date issued:} &  {\color{blue}29th March 2019}\\
-{\color{blue}Document status:} & {\color{blue}Draft}\\
-{\color{blue}Version number:} & {\color{blue} 0.5}\\
+{\color{blue}Date issued:} &  {\color{blue}15th May 2019}\\
+{\color{blue}Document status:} & {\color{blue}Released}\\
+{\color{blue}Version number:} & {\color{blue} 1.0}\\
 {\color{blue}Document history:} & \\
 \end{tabular}
 
@@ -143,6 +143,11 @@ Paul Hewson & 0.4 & Add SAE \\
 \hline
 Paul Hewson & 0.5 & Release draft\\
 \hline
+Paul Hewson & 0.6 & Client revisions\\
+\hline
+Laurence Oakes-Ash & 1.0 & Release report\\
+\hline
+
 \end{tabular}                    
 
                     
@@ -152,9 +157,8 @@ Paul Hewson & 0.5 & Release draft\\
 \end{itemize}
 
 {\color{blue}Approved by:}
-%Laurence Oakes-Ash BSc ACMA CGMA MCIHT Director
 \begin{itemize}
-\item[] Project still in draft
+\item[] Laurence Oakes-Ash BSc ACMA CGMA MCIHT Director
 \end{itemize}
 
 \newpage
@@ -213,8 +217,16 @@ March 2017 - February 2018 & 47,477
 \chapter{Summary of Method}
 
 \section{Small area estimation}
+\label{sae_description}
 
 \N Small Area Estimation (SAE) techniques have gained increasing acceptance over the last 3 decades\footnote{Rao, J.N.K. (2003) Small Area Estimation New York, Wiley}. There are a variety of well established approaches, the ones used here draw from model-based survey analysis and seek to ``pool'' evidence drawn from across a wider sample in order to ``enhance'' local estimates\footnote{Gelman, A. and Hill, J. (2007) Data Analysis Using Regression and Multilevel/Hierarchical Models Cambridge, CUP}.   They are considered to have some similarities with a post-stratification based approach in design based survey methods.
+
+
+\N The core idea of this approach to small area estimation is set out in figure~\ref{sae_pic}.
+
+\input{sae_pic.tex}
+
+\noindent There are similarities to post-stratification (a very well established design based approach to survey estimation)\footnote{Andrew Gelman and Thomas C. Little (1997), ``Poststratification Into Many Categories Using Hierarchical Logistic Regression'', Technical report, University of Columbia}.   The advantages of a modelling based approach (Bayesian or otherwise) are the way additional multilevel data can be structured.  Auxiliary data can be taken from a variety of sources including the relative spatial structure of the sampling points. An advantage of Bayesian methods are that provided the variables used for conventional weighting are used in fitting the models, this account for the sampling pattern.
 
 
 \N Focusing on the behaviour of individual respondents nested within local authorities -- a classic ``multilevel'' scenario -- this study has adopted a conventional approach to dealing with hierarchically structured data with a simple count response; namely generalized linear mixed-effects regression modelling. It is an approach that aims to capture, as far as possible, the relationship between the response (or dependent variable) and a number of independent variables which include categorical variables describing individuals' tenure, age, sex, ethnicity, disability, marital status, work status, social classification, lifestage, adults / children in household, size of household, working status, car ownership and their self reported general health\footnote{In order to achieve some parsimony, different models draw upon different sets of categorical variables, for example age may be split into different bands.} The multilevel models are thus used to estimate individual level parameters that explain the relationship between these categorical variables and the response, whilst simultaneously allowing for a random intercept that is unique for each local authority and which describes any systematic authority-by-authority variation in the response that is not explained by the individual-level model.
@@ -279,6 +291,8 @@ where $\boldsymbol{\beta}$ denotes the model parameters and $\boldsymbol{x}$ den
 
 \input{SAE.tex}
 
+\input{SAE_forecasts.tex}
+
 
 \chapter{Conclusions}
 
@@ -286,9 +300,17 @@ where $\boldsymbol{\beta}$ denotes the model parameters and $\boldsymbol{x}$ den
 
 \N The synthetic small area estimates for the two outcome variables (Q1 and Q17) are made available as a set of \texttt{.csv} files giving the ONS code for the small area (Local Authority and MSOA) along the posterior median and 95\% credible intervals for the estimated number of people who made a trip in the last week, or who made a trip more than once of twice in the last year.   The R code necessary to reproduce this analysis is available in a github repository.
 
-\N This feasibility study has demonstrated the viability of a small area approach to the MENE survey.   There are some challenges to be reconciled.   For example, ownership of a car is a strong predictor of engagement with the natural environment, yet does not seem to be recorded in the survey.   This reduces the precision by which small area estimation methods can predict a response.
+\N This feasibility study has demonstrated the viability of a small area approach to the MENE survey.   Tables~\ref{q1_rms} and \ref{q17_rms} indicate a constructed Residual Mean Square Error (RMS) estimate to illustrate the likely effect of reducing sample size.   It can be seen that sample size reductions have less impact in terms of Q1 (trips in the previous week) than Q17 (at least monthly trips in previous year).   There are two points to note. Firstly, the RMS is computed using the entire dataset for 2015/16 as the ``gold standard''. Clearly, it would be preferable to have an actual ``gold standard''; most methodological studies in small area estimation conduct an entirely simulation based exercise where the entire population is synthesised, a sample taken and the small area estimates compared the the simulated ``gold standard'' or ``ground truth''.  Therefore these RMS estimates can not be used to compare this method with any other; they can only be used internally, to demonstrate how the quality of the estimates decreases with sample size.
 
-\N It would seem that, using appropriate small area estimation methods, a reduction in sample size is possible.  The challenge in this work is that it assumes that the model is essentially correct.   It assumes that specific person types generally behave the same wherever they are in the country.  This is rarely a popular assumption with local authorities being judged on the output of such a modelling exercise.  It is possible with more judicious modelling (such as spatial random effects models using the postcode sector of the respondent) to better estimate local authority specific random effects. Clearly this requires both further technical work and further discussions with stakeholders as to the likely acceptablility of such modelling.   Similarly, producing more granular geographical results such as MSOA level small area estimates, while feasible perhaps merits further work looking at local specific effects.
+\N It is apparent from several of the caterpillar plots presented that, when using data from 2015/16, the interval estimates for several local authorities are extremely wide.  This is because there were few or no respondents from those local authorities in that year.   There are two solutions to this problem.  The first is to establish an upper level model for the survey geography. Allowing spatially correlated random effects would mean that the random effect for any local authority would be based on its neighbours values as well as its own.   A more data driven approach would be to develop an upper level model based on local authority specific predictor variables.    We would further recommend for any subsequent small area estimation that all available years' data should be used, which would allow a data driven model to use patterns between individuals and areas to be established, even allowing for changes over time.
+
+\N There are some data challenges to be reconciled. Firstly, ownership of a car is a strong predictor of engagement with the natural environment, yet does not seem to be recorded in the most recent two years of the available survey.   This reduces the precision by which small area estimation methods can predict a response.  We would recommend that this question be restored in subsequent years.  It is possible to incorporate missing data imputation methods within a Bayesian framework and this could be done in a definitive study and data from 2016/17 and 2017/2018 could be used to get stronger evidence on the relationship between other person type variables and geographical information. However, whilst Bayesian methods are powerful, they are not a magic wand and data would always be preferred to any compensatory technique.
+
+\N There are other questions (general health) which are also only avaialble for certain years.   More significantly, there are other survey questions which have drifted from the census definitions; for example limiting long term illness in the census now records at three levels but the MENE survey has a simple yes/no question in response to disability. Small area estimation, and many techniques around non-random sampling which aim to weight a sample after the event (e.g. post-stratification) require that auxiliary variables are available which match the variables in the survey of interest.   It is always a balance between maintaining a consistent data collection over time and keeping up to date with external changes.  However, we would suggest that a modelling based approach allows any changes to be modelled and hence the advantages seem to lie more with consistency between the MENE survey and external data. If the MENE survey were ever to be based on a non-random sampling frame (such as happens in web-surveys) we would suggest that the need to match respondent information with auxiliary data becomes even more important.
+
+\N It would seem that, using appropriate small area estimation methods, a reduction in sample size is possible.  The challenge in this work is that it assumes that the model is essentially correct.   It assumes that specific person types generally behave the same wherever they are in the country with the exception of an overall local effect captured by the local authority specific random effects.  This is rarely a popular assumption with local authorities being judged on the output of such a modelling exercise.  It is possible with more judicious modelling (such as spatial random effects models using the postcode sector of the respondent) to better estimate local authority specific random effects. Clearly this requires both further technical work and further discussions with stakeholders as to the likely acceptablility of such modelling.   Similarly, producing more granular geographical results such as MSOA level small area estimates, while feasible perhaps merits further work looking at local specific effects.
+
+\N It is possible to produce small area estimates for finer domains, such as MSOAs. These results are given in a csv file.  These may be useful in terms of identifying groups of people who are not making the most of contact with the natural environment. We would however suggest that this does not necessarily require small area estimates, but that the same understanding could be gained by carefully examining the model results. For example, the ``fixed effects'' provide information on types of people who have differential access to a natural environment.   Local authority random effects provide information on areas of the country where access might be higher or lower than the average, assuming every part of the country had the same mix of people types.
 
 \chapter{Appendix}
 

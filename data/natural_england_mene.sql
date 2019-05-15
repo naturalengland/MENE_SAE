@@ -111,11 +111,14 @@ end $$;
 
 -- e3_01 Other participation - Watching or listening to nature programmes o
 
+
 drop table if exists natural_england_mene_respondents;
 create table natural_england_mene_respondents (
     id2 text,
     respondent_id text,
     interview_date date,
+    q1 text,
+    q17 text,
     survey_year natural_england_mene_surveyyear,
     age natural_england_mene_age,
     sex natural_england_mene_sex,
@@ -149,6 +152,8 @@ create table natural_england_mene_respondents (
     attitude_to_garden natural_england_mene_yesno[],
     postcode text,
     geom geometry,
+    ons_code text,
+    ons_name text,
     survey_weights float[])
 ;
 
@@ -156,15 +161,61 @@ create or replace function staging.import_natural_england_mene_respondents() ret
 as $$
 declare
 begin
+    drop table if exists mene_to_ons_2011;
+    create temp table mene_to_ons_2011 as
+        with mene(laname) as (
+            select distinct residence_localauthority as mene_name
+            from staging.natural_england_mene_respondents_y1_9)
+            select laname, district_name
+            from ons_lad
+            join mene
+            on ons_lad.district_name = mene.laname;
+    insert into mene_to_ons_2011 values
+        ('Congleton', 'Cheshire East'),
+        ('Vale Royal', 'Cheshire West and Chester'),
+        ('North Wiltshire', 'Wiltshire'),
+        ('North Cornwall', 'Cornwall'),
+        ('Alnwick', 'Northumberland'),
+        ('Durham', 'County Durham'),
+        ('Caradon', 'Cornwall'),
+        ('Castle Morpeth', 'Northumberland'),
+        ('Oswestry', 'Shropshire'),
+        ('Chester',  'Cheshire West and Chester'),
+        ('Shrewsbury and Atcham', 'Shropshire'),
+        ('Kennet', 'Wiltshire'),
+        ('West Wiltshire', 'Wiltshire'),
+        ('Kerrier', 'Cornwall'),
+        ('Derwentside', 'County Durham'),
+        ('Carrick', 'Cornwall'),
+        ('Berwick-upon-Tweed', 'Northumberland'),
+        ('South Bedfordshire', 'Central Bedfordshire'),
+        ('Macclesfield', 'Cheshire East'),
+        ('Wansbeck', 'Northumberland'),
+        ('Bridgnorth', 'Shropshire'),
+        ('Wear Valley', 'County Durham'),
+        ('Easington', 'County Durham'),
+        ('Tynedale', 'Northumberland'),
+        ('Chester-le-Street', 'County Durham'),
+        ('South Shropshire', 'Shropshire'),
+        ('Mid Bedfordshire', 'Central Bedfordshire'),
+        ('North Shropshire', 'Shropshire'),
+        ('Crewe and Nantwich', 'Cheshire East'),
+        ('Teesdale', 'County Durham'),
+        ('Salisbury', 'Wiltshire'),
+        ('Penwith', 'Cornwall'),
+        ('Ellesmere Port & Neston', 'Cheshire West and Chester'),
+        ('Sedgefield', 'County Durham'),
+        ('Restormel', 'Cornwall'),
+        ('Blyth Valley', 'Northumberland');
     truncate table natural_england_mene_respondents;
     insert into natural_england_mene_respondents (
-            id2, respondent_id, interview_date, survey_year, age, sex,
+            id2, respondent_id, interview_date, q1, q17, survey_year, age, sex,
             ethnicity, disability, marital, workstat, seg,
             segall, lifestage, physical, adults_in_hh, child_in_hh, nchild_in_hh, hh_size,
             tenure, workstat5, car, dog, general_health, internet_access, email, wellbeing,
             barriers_to_visits, attitudes_to_environment, activities_in_natural_environment,
             pro_environmental_attitudes, lifestyle_changes, attitudes_to_local_greenspaces,
-            has_garden, attitude_to_garden, postcode, geom, survey_weights)
+            has_garden, attitude_to_garden, postcode, geom, ons_code, ons_name, survey_weights)
         with postcode_areas (postcode_area, geom) as (
             select substring(postcode, '^[a-zA-Z]+\d\d?[a-zA-Z]?\s*\d+') as postcode_area, geom
                 from ons_postcode_directory_centroids),
@@ -176,6 +227,8 @@ begin
             id2,
             respondentid,
             to_date(interviewdate, 'MM/DD/YYYY'),
+            q1,
+            q17,
             year::natural_england_mene_surveyyear,
             age::natural_england_mene_age,
             sex::natural_england_mene_sex,
@@ -271,7 +324,9 @@ begin
                    nullif(e8_16, ' ')::natural_england_mene_yesno,
                    nullif(e8_17, ' ')::natural_england_mene_yesno],
              postcode,
-             geom,
+             pca.geom,
+             o.code,
+             o.district_name,
              array[weekweightannual, monthweightannual, quarterweightannual,
                   converted_weekweightannual, converted_monthweightannual,
                   converted_quarterweightannual, weekweightcumulative,
@@ -280,9 +335,19 @@ begin
                   laweighty2weekly, laweighty3weekly, laweighty4weekly,
                   laweighty5weekly, laweighty6weekly, laweighty7weekly, laweighty1y7weekly,
                   laweightweeklyy1y7monthly]
-             from staging.natural_england_mene_respondents_y1_9
+             from staging.natural_england_mene_respondents_y1_9 m
              left join pca
              on residence_postcode_sector = postcode
+             left join mene_to_ons_2011 mo
+             on m.residence_localauthority = mo.laname
+             left join ons_lad o
+             on mo.district_name = o.district_name
     ;
 end
 $$ language plpgsql;
+
+-- with barry (laname) as (
+-- select distinct residence_localauthority as laname from staging.natural_england_mene_respondents_y1_9)
+-- select code, district_name, laname from ons_lad
+-- right join barry
+-- on ons_lad.district_name = barry.laname;

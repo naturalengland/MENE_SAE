@@ -77,7 +77,7 @@ print(sam_cars, include.colnames=FALSE, format.args=list(big.mark=","))
 \N However, an obvious problem with the car ownership variable appears to be in relation to the years when this variable was recorded.   Table~\ref{mene_car_year} illustrates the problem.  Car ownership stopped being recorded after survey year 2015/2016.
 
 <<mene_car_year, fig=FALSE, results=tex, echo=FALSE>>=
-mene_car_year <- xtable(with(mene.df, xtabs(~year + car, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by car ownership by year", label="mene_car_year", auto=TRUE)
+mene_car_year <- xtable(with(mene.df, xtabs(~survey_year + car, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by car ownership by year", label="mene_car_year", auto=TRUE)
 print(mene_car_year, include.colnames=TRUE, format.args=list(big.mark=","))
 @
 
@@ -103,7 +103,7 @@ print(sam_health, include.colnames=FALSE, format.args=list(big.mark=","), saniti
 \N Table~\ref{mene_genhealth_year} breaks down the MENE responses by year, showing firstly, that this question only started to be asked in 2014/2015 and secondly that only around 10\% of respondents had a response recorded.
 
 <<mene_genhealth_year, fig=FALSE, results=tex, echo=FALSE>>=
-mene_genhealth_year <- xtable(with(mene.df, xtabs(~year + genhealth, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by general health by year", label="mene_genhealth_year", auto=TRUE)
+mene_genhealth_year <- xtable(with(mene.df, xtabs(~survey_year + genhealth, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by general health by year", label="mene_genhealth_year", auto=TRUE)
 print(mene_genhealth_year, include.colnames=TRUE, format.args=list(big.mark=","), size="\\fontsize{9pt}{10pt}\\selectfont", sanitize.text.function=f)
 @
 
@@ -250,7 +250,7 @@ print(sam_disability, include.colnames=FALSE, format.args=list(big.mark=","), sa
 
 
 <<mene_disability_year, fig=FALSE, results=tex, echo=FALSE>>=
-mene_disability_year <- xtable(with(mene.df, xtabs(~year + disability, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by disability status by year", label="mene_disability_year", auto=TRUE)
+mene_disability_year <- xtable(with(mene.df, xtabs(~survey_year + disability, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by disability status by year", label="mene_disability_year", auto=TRUE)
 print(mene_disability_year, include.colnames=TRUE, format.args=list(big.mark=","))
 @
 
@@ -259,7 +259,7 @@ print(mene_disability_year, include.colnames=TRUE, format.args=list(big.mark=","
 
 
 <<mene_disability_year, fig=FALSE, results=tex, echo=FALSE>>=
-mene_disability_year <- xtable(with(mene.df, xtabs(~year + disability, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by disability status by year", label="mene_disability_year", auto=TRUE)
+mene_disability_year <- xtable(with(mene.df, xtabs(~survey_year + disability, exclude=NULL, na.action=na.pass)), caption="MENE Respondents by disability status by year", label="mene_disability_year", auto=TRUE)
 print(mene_disability_year, include.colnames=TRUE, format.args=list(big.mark=","))
 @
 
@@ -365,16 +365,16 @@ Number in household & All years (map to MENE)
 
 \subsection{Response variables}
 
-\N Finally, table~\ref{mene_q1_year} and table~\ref{q17_year} summarise the responses of interest for Question 1 and Question 17 respectively.   For Q1 the responses have been dichotomised to indicate whether a respondent stated they had taken a trip to the natural environment in the last week. Question 17 has been dichotomised to indicate whether in the past year the respondent reported having taken a trip at least once a month.
+\N Finally, table~\ref{mene_q1_year} and table~\ref{mene_q17_year} summarise the responses of interest for Question 1 and Question 17 respectively.   For Q1 the responses have been dichotomised to indicate whether a respondent stated they had taken a trip to the natural environment in the last week. Question 17 has been dichotomised to indicate whether in the past year the respondent reported having taken a trip at least once a month.
 
 <<mene_q1_year, fig=FALSE, results=tex, echo=FALSE>>=
-mene_q1_year <- xtable(with(mene.df, xtabs(~year + addNA(factor(q1_binary, labels = c("No", "Yes"))), exclude=NULL, na.action=na.pass)), caption="MENE trips in last week", label="mene_q1_year", auto=TRUE)
+mene_q1_year <- xtable(with(mene.df, xtabs(~survey_year + addNA(factor(q1_binary, labels = c("No", "Yes"))), exclude=NULL, na.action=na.pass)), caption="MENE trips in last week", label="mene_q1_year", auto=TRUE)
 print(mene_q1_year, include.colnames=TRUE, format.args=list(big.mark=","))
 @
 
 \bigskip
 <<mene_q17_year, fig=FALSE, results=tex, echo=FALSE>>=
-mene_q17_year <- xtable(with(mene.df, xtabs(~year + addNA(factor(q17_binary, labels = c("No", "Yes"))), exclude=NULL, na.action=na.pass)), caption="MENE at least one trip a month in previous twelve months by year", label="mene_q17_year", auto=TRUE)
+mene_q17_year <- xtable(with(mene.df, xtabs(~survey_year + addNA(factor(q17_binary, labels = c("No", "Yes"))), exclude=NULL, na.action=na.pass)), caption="MENE at least one trip a month in previous twelve months by year", label="mene_q17_year", auto=TRUE)
 print(mene_q17_year, include.colnames=TRUE, format.args=list(big.mark=","))
 @
 

@@ -31,11 +31,10 @@ label_las <- function(la_dict, n_reffs){
   }
 
 create_la_index <- function(mene.df){
-    mene.df$la <- mene.df$residence_localauthority
     no_names <- c(" ", "355", "356", "358", "359", "361", "362", "367", "368", "371", "372", "373", "374", "375")  
-    for (no_name in no_names) {mene.df$la[mene.df$la == no_name] <- NA}
-    mene.df$la <- as.factor(mene.df$la)
-    mene.df$la_number <- as.numeric(mene.df$la)
+    for (no_name in no_names) {mene.df$ons_code[mene.df$ons_code == no_name] <- NA}
+    mene.df$ons_code <- as.factor(mene.df$ons_code)
+    mene.df$la_number <- as.numeric(mene.df$ons_code)
     return(mene.df)
 }
 
