@@ -316,7 +316,7 @@ print(sam_dpcfamuk11, include.colnames=FALSE, format.args=list(big.mark=","), sa
 
 \subsection{Areal level variables}
 
-\N Further variables are available in the MENE survey describing the area ratherr than the individual. It is our view that given we are given the respondent postcode sector, it is possible to obtain a much wider range of geospatial information than that already contained in the MENE survey. This would also, by definition, be immediately available as an auxiliary variable. It would also be possible to incorporate this in a multilevel model, where we could allow for the fact that person-types in a similar area might have some commonality in their tendency to engage with the natural environment. More importantly, with a little more development time, it would be possible to develop these in a fully spatial model, and allow for a spatial correlation in the way people engage with the environment as well as explicitly using geographical factor, such as ease of access to green space to inform a modelling exercise. These are not considered here further due to the time restrictions on the feasibility study, but in our view would provide powerful additional insight in their own right, as well as strengthening the small area estimation. 
+\N Further variables are available in the MENE survey describing the area rather than the individual. It is our view that given we are given the respondent postcode sector, it is possible to obtain a much wider range of geospatial information than that already contained in the MENE survey. This would also, by definition, be immediately available as an auxiliary variable. It would also be possible to incorporate this in a multilevel model, where we could allow for the fact that person-types in a similar area might have some commonality in their tendency to engage with the natural environment. More importantly, with a little more development time, it would be possible to develop these in a fully spatial model, and allow for a spatial correlation in the way people engage with the environment as well as explicitly using geographical factor, such as ease of access to green space to inform a modelling exercise. These are not considered here further due to the time restrictions on the feasibility study, but in our view would provide powerful additional insight in their own right, as well as strengthening the small area estimation. 
 
 \clearpage
 
@@ -340,26 +340,6 @@ Number in household & All years (map to MENE)
 \caption{Summary of variables considered for modelling purposes}
 \end{table}
 
-\N In Bayesian models, it is relatively straightforward to include a data imputation stage to handle missing data. This can easily deal with small numbers of randomly missing responses from individual responses. It cannot however be assumed that it magically corrects two years of systematic non-response.  As this study is intended as a quick feasibility study, the data will be subsetted to include data from survey year 2009/2010 through to 2015/2016 for variable screening and local small area prediction. For overall sample size work, it will use just data from 2015/2016.   
-
-
-\N A dominant feature of this exploration is that there are a number of systematically missing responses.  Table~\ref{varscreen} lists the variables that will be considered for this feasibility study. The inclusion of Car Ownerhip means that, for modelling purposes, we will only consider data up until the survey year 2015/2016.   
-
-
-\begin{table}[!ht]
-\begin{tabular}{ll}
-Age & All years \\
-Sex & All years \\
-Car Ownership & Until 2015/16\\
-Socio-economic grouping & All years \\
-Ethnicity & All years (Map to 5 groups) \\
-Marital status & All years (map to MENE) \\
-Children in household & All years (create binary indicator)\\
-Number in household & All years (map to MENE)
-\end{tabular}
-\label{varscreen}
-\caption{Summary of variables considered for modelling purposes}
-\end{table}
 
 \N In Bayesian models, it is relatively straightforward to include a data imputation stage to handle missing data. This can easily deal with small numbers of randomly missing responses from individual responses. It cannot however be assumed that it magically corrects two years of systematic non-response.  As this study is intended as a quick feasibility study, the data will be subsetted to include data from survey year 2009/2010 through to 2015/2016 for variable screening and local small area prediction. For overall sample size work, it will use just data from 2015/2016.
 

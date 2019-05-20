@@ -1,7 +1,7 @@
 .SUFFIXES: .tex .pdf .Rnw
 
 MAIN = mene
-RNWINCLUDES = EDA Modelling SAE SAE_forecasts
+RNWINCLUDES = EDA Modelling SAE SAE_forecasts SAE_forecasts17
 TEX = $(RNWINCLUDES:=.tex)
 RNWFILES = $(RNWINCLUDES:=.Rnw)
 

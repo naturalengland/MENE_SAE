@@ -65,7 +65,8 @@ format_hierarchical_forecast <- function(y, mene.df, individual_terms, sam.df){
   X_star <- na.omit(X_star)
   stan_data = list(y=as.integer(without_nas$y), X=without_nas$X, N=length(without_nas$y),
                    K=dim(without_nas$X)[2], la_index=without_nas$la_index,
-                   N_las=max(without_nas$la_index), X_star=X_star, N_star=dim(X_star)[1])
+                   N_las=324, # max(without_nas$la_index),
+                   X_star=X_star, N_star=dim(X_star)[1])
   options(na.action=current.na.action)
   return(stan_data)
 }
