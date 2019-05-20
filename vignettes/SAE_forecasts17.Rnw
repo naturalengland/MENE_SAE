@@ -1,0 +1,171 @@
+\SweaveOpts{prefix.string=figs/eda}
+<<prep.R, echo=FALSE, results=hide>>=
+library(rstan)
+library(dplyr)
+source("../R_script/get_mene.R")
+source("../R/sanitize_mene.R")
+mene.df <- mene_factors(mene.df)
+mene.df <- mene_code_q1(mene.df)
+mene.df <- mene_code_q17(mene.df)
+source("../R_script/get_sam_preds.R")
+source("../R/mene_to_stan.R")
+source("../R/sam_to_stan.R")
+mene.df <- create_la_index(mene.df)
+sam.df <- match_sam(sam.df)
+mene.df$marstat[mene.df$marstat == "NA"] <- NA
+mene.df$marstat <- droplevels(mene.df$marstat)
+mene.df$marstat <- relevel(mene.df$marstat, ref="Single")
+mene.df$child_in_hh <- relevel(mene.df$child_in_hh, ref="None")
+mene.df$car <- as.factor(as.character(mene.df$car, exclude=NA))
+sam.df$marstat <- relevel(sam.df$marstat, ref="Single")
+sam.df$child_in_hh <- relevel(sam.df$child_in_hh, ref="None")
+sam.df$child_in_hh <- droplevels(sam.df$child_in_hh)
+sam.df$marstat <- droplevels(sam.df$marstat)
+mene.df <- mene.df[mene.df$survey_year != "Y1617" & mene.df$survey_year != "Y1718",]
+mene.df$survey_year <- factor(mene.df$survey_year, levels = c("Y0910", "Y1011", "Y1112", "Y1213", "Y1314", "Y1415", "Y1516"))
+weightings <- read.csv("../data/weights2.csv", header=TRUE)
+# colnames(weightings) <- c("ons_code", "sex", "age", "weight")
+weightings$weight <- weightings$weights2
+rms <- function(x, y){
+    rho <- cor(x, y)
+    return(sqrt(1 - rho**2) * sd(y, na.rm=TRUE))}
+@
+ 
+<<one_year_only.R, fig=FALSE, echo=FALSE, results=hide>>=
+mene_sample.df <- mene.df[mene.df$survey_year == "Y1516",]
+mene_sample.df <- create_la_index(mene_sample.df)
+# is the problem here?
+la_dict <- hash(c(1:length(levels(mene_sample.df$ons_code))), levels(mene_sample.df$ons_code))
+rm(mene.df)
+@
+
+<<aggregate_sam.R, fig=FALSE, echo=FALSE, results=hide>>=
+target_colnames <- c("age", "sex", "car", "seg", "marstat", "ethnicity_5", "child_in_hh", "adults_in_hh", "ons_code")
+target_sam.df <- sam.df[target_colnames]
+summary_sam.df <- as.data.frame(na.omit(target_sam.df) %>% count(age, sex, car, seg, marstat, ethnicity_5, child_in_hh, adults_in_hh, ons_code))
+rm(sam.df)
+rm(target_sam.df)
+
+sam_la_mene_codes <- function(summary_sam.df, dict_la){
+    mene_codes <- vector("numeric", length(summary_sam.df$ons_code))
+    for (i in 1:length(summary_sam.df$ons_code)){
+        ons <- summary_sam.df$ons_code[i]
+        if (ons %in% keys(dict_la)){
+            mene_codes[i] <- as.numeric(values(dict_la, ons))
+        } else {
+            mene_codes[i] <- NA}}
+    return(mene_codes)
+}
+
+summary_sam.df$sam_la_index <- sam_la_mene_codes(
+    summary_sam.df, hash(values(la_dict), keys(la_dict)))
+summary_sam.df <- summary_sam.df[!is.na(summary_sam.df$sam_la_index),]
+
+@ 
+
+
+\subsection{Question 17: effect of reducing sample size}
+
+\N The same procedure is repeated on Question 17.   The significant point here is that considerably fewer people have been asked this question.
+
+<<fit_model_function17.R, echo=FALSE, results=hide, fig=FALSE>>=
+fit_model17 <- function(mene_sample.df, summary_sam.df){
+mene_sample.df <- mene_sample.df[!is.na(mene_sample.df$q17_binary),]
+stan_data <- format_hierarchical_forecast(mene_sample.df$q17_binary, mene_sample.df,
+"~ age + sex + age:sex + car + seg + marstat + ethnicity_5 + child_in_hh + adults_in_hh", summary_sam.df)
+stan_data$bin_n = summary_sam.df$n
+stan_data$sam_la_index <- summary_sam.df$sam_la_index
+m <- stan_model(file = '../stan/simple_hierarchical_bernoulli_glm_forecast.stan')
+f <- optimizing(m, data = stan_data, hessian = TRUE)
+
+post_reff_names <- label_las(la_dict, max(stan_data$la_index, na.rm=TRUE))
+stan_post_1516=extract_bayesian_point_estimates(stan_data, f, post_reff_names)
+summary_sam.df$post_mean <- f$par[(length(f$par) - dim(summary_sam.df)[1] + 1): length(f$par)]
+
+results <- aggregate(summary_sam.df$post_mean, by = list(age=summary_sam.df$age, sex=summary_sam.df$sex, ons_code=summary_sam.df$ons_code), FUN=sum)
+return(results)
+}
+
+la_preds <- function(weightings, results){
+out <- merge(weightings, results)
+out$projected_trips <- as.numeric(as.character(out$weight)) * out$x
+sum(out$projected_trips)
+return(aggregate(out$projected_trips, by = list(ons_code=out$ons_code), FUN=sum))
+}
+
+@
+
+
+<<q17_rms.R, echo=FALSE, results=hide, fig=FALSE>>=
+results_100 <- fit_model17(mene_sample.df, summary_sam.df)
+preds_100 <- la_preds(weightings, results_100)
+results_95 <- fit_model17(mene_sample.df[sample(nrow(mene_sample.df), dim(mene_sample.df)[1] * 0.95),], summary_sam.df)
+preds_95 <- la_preds(weightings, results_95)
+rms_95 <- rms(preds_95$x, preds_100$x)
+results_80 <- fit_model17(mene_sample.df[sample(nrow(mene_sample.df), dim(mene_sample.df)[1] * 0.8),], summary_sam.df)
+preds_80 <- la_preds(weightings, results_80)
+rms_80 <- rms(preds_80$x, preds_100$x)
+results_75 <- fit_model17(mene_sample.df[sample(nrow(mene_sample.df), dim(mene_sample.df)[1] * 0.75),], summary_sam.df)
+preds_75 <- la_preds(weightings, results_75)
+rms_75 <- rms(preds_75$x, preds_100$x)
+results_50 <- fit_model17(mene_sample.df[sample(nrow(mene_sample.df), dim(mene_sample.df)[1] * 0.5),], summary_sam.df)
+preds_50 <- la_preds(weightings, results_50)
+rms_50 <- rms(preds_50$x, preds_100$x)
+results_30 <- fit_model17(mene_sample.df[sample(nrow(mene_sample.df), dim(mene_sample.df)[1] * 0.3),], summary_sam.df)
+preds_30 <- la_preds(weightings, results_30)
+rms_30 <- rms(preds_30$x, preds_100$x)
+results_10 <- fit_model17(mene_sample.df[sample(nrow(mene_sample.df), dim(mene_sample.df)[1] * 0.1),], summary_sam.df)
+preds_10 <- la_preds(weightings, results_10)
+rms_10 <- rms(preds_10$x, preds_100$x)
+
+@ 
+
+
+\begin{table}
+\begin{tabular}{lr}
+Sample size relative to full dataset & Residual Mean Square Error \\
+\hline
+95\% Sample & \Sexpr{round(rms_95, 2)} \\
+80\% Sample & \Sexpr{round(rms_80, 2)} \\
+75\% Sample & \Sexpr{round(rms_75, 2)} \\
+50\% Sample & \Sexpr{round(rms_50, 2)} \\
+30\% Sample & \Sexpr{round(rms_30, 2)} \\
+10\% Sample & \Sexpr{round(rms_10, 2)} \\
+\end{tabular}
+\caption{Q17: Root mean square error of sub-sample predictions}
+\label{q17_rms}
+\end{table}
+
+
+\begin{figure*}
+<<rms_q17, fig=TRUE, echo=FALSE, results=hide>>=
+plot(c(10, 30, 50, 75, 80, 95),
+     c(rms_10, rms_30, rms_50, rms_75, rms_80, rms_95),
+     type="b", col="blue", main = "RMS by sample size", xlab="Sample size (% of 2015/16 data)", ylab = "RMS")  
+
+@ 
+\caption{Q17 (more than monthly trips in last year): estimates Residual Mean Square for random sub-samples relative to whole dataset for 2015/16}
+\label{q17_plot_rms}
+\end{figure*}
+
+\newpage
+
+\N Whilst full results are given in a \texttt{csv} file, figure~\ref{q17map} presents a choropleth map of the number of people in each authority area who had made a trip to the natural environment in the previous week.
+
+\begin{figure}
+<<mapq17.R, fig=TRUE, echo=FALSE, results=hide>>=
+library(rpostgis)
+library(sp)
+drv <- dbDriver("PostgreSQL")
+con <- dbConnect(drv, dbname = "gis")
+map.df <- pgGetGeom(con, "ons_lad")
+preds_100$x <- preds_100$x / 1000
+preds_100$x[preds_100$x > 500] <- NA
+choro <- sp::merge(map.df, preds_100, by.x="code", by.y="ons_code")
+spplot(choro, zcol="x", main = "Estimated number of trip makers (1000)")
+@
+\caption{Q17: Small area estimate of the number of people in each lower level authority reporting at least one trip a month  to the natural environment in the previous year based on 2015/16 MENE data}
+\caption{q17map}
+\end{figure}
+
+
